@@ -1,50 +1,39 @@
 # Running the first cycle
 
-Everything is configured and nothing has run. Three facts explain that, and two
-of them are closed by working through this page in order.
+Everything is configured and nothing has sent. One fact explains that, and it
+is not a missing setting.
 
 | Why nothing has happened | Fixed by |
 | --- | --- |
-| All three flows are in Draft, so they never send | Steps 1–3 |
-| Flow emails have no template assigned | Step 1 |
-| The list has no subscribers, because the storefront is password-locked | Step 2 |
+| The list has no subscribers, because the storefront is password-locked and consent cannot be given on someone's behalf | Step 1 |
+| All three flows are in Draft | Steps 2-3 |
 
-Do these in order. Activating a flow before its emails have content sends
-*"It's time to design"* to a real inbox, and that is not recoverable.
+Do these in order. Activating a flow before checking its content sends to a
+real inbox, and that is not recoverable.
 
 ---
 
-## 0. Sending domain — done
+## 0. Done already
 
-`send.negozio-online.org` is **Active**. Verified, then activated: two separate
-steps, and a domain left merely Verified sends on Klaviyo's shared domain
-without saying so anywhere in the report.
+| | |
+| --- | --- |
+| Sending domain | `send.negozio-online.org` **Active**. Verified and activated are two separate steps; a domain left merely Verified sends on Klaviyo's shared domain and nothing in the report says so. |
+| Email content | All seven flow emails carry the copy in this repo. `python src/build_templates.py --verify` reads them back from Klaviyo and exits non-zero on any drift. |
+| Sender | *Torrefazione Nord* on all seven. Three of them still read *Azienda* — setting the account sender does not propagate to messages that already exist. |
+| Win-back offer | `TORNA15` in Shopify, 15% off order, one use per customer. |
 
-## 1. Generate and assign the templates
+Two things worth knowing before touching the content again:
 
-```bash
-python src/build_templates.py --out build/
-```
+**The preheader lives in the HTML, not in Klaviyo's Preview text field.** Each
+template opens with a hidden `div` carrying the preheader, which is the
+portable way every client understands. Filling Klaviyo's field as well would
+render it twice, so that field is deliberately left empty.
 
-Open the files in `build/` and read them. This is the last point where a typo
-costs nothing.
+**Re-pasting is manual.** See the API constraint in the README. After any copy
+change: `python src/build_templates.py --out build/`, paste the changed file
+into the flow message's code editor, then `--verify` to prove it took.
 
-```bash
-export KLAVIYO_API_KEY=pk_xxx && python src/build_templates.py --live
-```
-
-The key needs the **`templates:write`** scope. A key created for the profile
-sync has read access to templates and no write access, and the call fails with
-`403 permission_denied` naming the missing scope — Klaviyo scopes are per
-resource, so read on a resource implies nothing about write. Settings → API
-keys → the key → add the scope, or issue a new one.
-
-Then in Klaviyo, for each of the seven emails: Flows → the flow → the email →
-**Change template** → pick the matching one. The names line up (`1.1`, `1.2`,
-`2.1` …). This part has no API: the Flows API exposes flow messages read-only,
-so template assignment is a manual step by design, not an oversight.
-
-## 2. Become the first subscriber
+## 1. Become the first subscriber
 
 The storefront needs the store password — Shopify forces password protection on
 development stores and the toggle cannot be turned off. Get it from Online
@@ -58,7 +47,7 @@ of the design.
 The list should now read 1. Check the profile: consent recorded, source
 recorded.
 
-## 3. Activate the welcome flow
+## 2. Activate the welcome flow
 
 Flow 1 → **Update status** → Live.
 
@@ -68,7 +57,7 @@ Do not activate anything before this point. Watch what 1.1 actually looks like
 in a real client — not in Klaviyo's preview, which renders in a browser and
 tells you nothing about Outlook.
 
-## 4. Trigger the abandoned cart
+## 3. Trigger the abandoned cart
 
 Activate Flow 2, then on the storefront: add a product, start checkout with the
 same address, and abandon it. `Checkout Started` fires, and email 2.1 arrives
@@ -79,7 +68,7 @@ before the four hours are up.** No email should arrive. That is the exit
 condition working, and it is the single most useful thing to be able to say you
 verified rather than assumed.
 
-## 5. The win-back cannot be demonstrated yet
+## 4. The win-back cannot be demonstrated yet
 
 Flow 3 triggers on entry to the `At risk` segment, which requires 91 or more
 days since the last order. The seeded orders are days old. Structurally, this
@@ -100,7 +89,7 @@ uses. If you run it `--live` and it moves a consenting profile into the segment,
 say plainly in the write-up that the date was pinned, or the number stops
 meaning anything.
 
-## 6. Fill in the results
+## 5. Fill in the results
 
 [`../reports/results.md`](../reports/results.md) has the structure. Record
 counts, not rates: two opens out of six is two opens, and calling it 33% invites

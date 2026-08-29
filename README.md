@@ -9,14 +9,16 @@ This is the companion to that analysis: there I *measure* lifecycle and RFM,
 here I *operate* on them. The bridge between the two is
 [`src/sync_klaviyo.py`](src/sync_klaviyo.py).
 
-> **Status (2026-08-29).** Store, ESP, sending-domain authentication, sender
-> identity, consent settings, the lifecycle segment and all three flows —
-> triggers, filters, delays, seven emails, tracking — are built, and the email
-> templates are generated from code. Every flow is **Draft**: nothing sends,
-> and the list has no subscribers. The results section fills in after the first
-> full cycle — [`docs/first-cycle.md`](docs/first-cycle.md) is the procedure for
-> running it. See [Boundaries](#boundaries) for exactly what is real here and
-> what is not.
+> **Status (2026-08-29).** Everything is built: store, ESP, an **Active**
+> sending domain, sender identity, consent settings, the lifecycle segment, and
+> all three flows — triggers, filters, delays, tracking, and seven emails whose
+> content is generated from code and **verified against this repo**
+> (`python src/build_templates.py --verify`). What has not happened is a send:
+> every flow is **Draft** and the list has no subscribers, because subscribing
+> is an act of consent that only a person can perform. The results section
+> fills in after the first full cycle —
+> [`docs/first-cycle.md`](docs/first-cycle.md) is the procedure. See
+> [Boundaries](#boundaries) for exactly what is real here and what is not.
 
 ## What is set up
 
@@ -33,7 +35,7 @@ here I *operate* on them. The bridge between the two is
 | Flow 1 Welcome | 1.1 (Day 0) → wait 3 days → 1.2 (Day 3) |
 | Flow 2 Abandoned cart | exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 |
 | Flow 3 Win-back | 3.1 (Day 0) → wait 7 days → 3.2 (Day 7) |
-| Every email | Smart Sending and UTM tracking on |
+| Every email | Content live, Smart Sending and UTM tracking on, sender *Torrefazione Nord* |
 
 ## Recruiter 5-minute route
 
@@ -125,15 +127,15 @@ private key on the command line lands in shell history) and pass `--live`:
 export KLAVIYO_API_KEY=pk_xxx && python src/sync_klaviyo.py --orders data/orders.csv --consent data/consent.csv --list-id ABC123 --live
 ```
 
-Building the seven email templates is the same shape — dry run first, and the
-key is read from the environment either way:
+The seven emails are rendered from the same repo and checked against what is
+actually live:
 
 ```bash
 python src/build_templates.py --out build/
 ```
 
 ```bash
-export KLAVIYO_API_KEY=pk_xxx && python src/build_templates.py --live
+export KLAVIYO_API_KEY=pk_xxx && python src/build_templates.py --verify
 ```
 
 Klaviyo's drag-and-drop editor has no HTML view, so assembling seven emails by
@@ -141,7 +143,19 @@ hand is about nine block operations each. Generating them from one render
 function instead means the layout is written once, the copy is reviewable in a
 diff, and a test can assert the things that only fail after a real send — a
 missing `{% unsubscribe %}`, a `{{ first_name }}` with no default, a cart email
-whose button does not point at the checkout URL.
+whose button does not point at the checkout URL, or a claim the storefront
+does not back.
+
+**The content cannot be pushed, and that is the platform's constraint, not a
+shortcut.** Klaviyo serves a flow message's template on `GET
+/api/templates/{id}` but answers `404` to `PATCH` on the same id, and `PATCH
+/api/flow-messages/{id}` is `405`. A template created through the API is
+therefore an orphan: nothing can point a flow message at it. The HTML goes in
+by hand, once, through the flow's code editor. What *is* automatable is the
+check — `--verify` reads each live template back and exits non-zero if it has
+drifted from this repo, which is the failure that actually happens: copy
+edited here, never re-pasted there. `--verify` needs read scope only; it never
+writes.
 
 ## Deliverability
 

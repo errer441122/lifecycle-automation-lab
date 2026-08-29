@@ -18,8 +18,12 @@ Klaviyo's footer, so without that tag the send would breach both the consent
 design in docs/consent.md and the one-click unsubscribe requirement in
 docs/deliverability.md.
 
-After running this, assign each template to its flow message in Klaviyo:
-Flows -> the flow -> the email -> Change template.
+The content cannot be pushed. Klaviyo serves a flow message's template on GET
+but answers 404 to PATCH on the same id, and PATCH on /api/flow-messages/{id}
+is 405 - so the HTML goes in by hand, once, in the flow's code editor. What can
+be automated is the check: --verify reads each live template back and fails if
+it has drifted from the copy in this repo, which is the failure that actually
+happens - copy edited here, never re-pasted there.
 
 Pure standard library.
 """
@@ -37,6 +41,24 @@ from pathlib import Path
 
 API_ROOT = "https://a.klaviyo.com/api/templates"
 API_REVISION = "2026-07-15"
+
+# The template each flow email already points at. Klaviyo creates one the first
+# time a message is given HTML content, and the flow message keeps pointing at
+# that id — so updating it in place is what actually changes the email that
+# sends. Creating a fresh template instead leaves an orphan in the library that
+# no flow references, because the Flows API is read-only (PATCH on
+# /api/flow-messages/{id} answers 405) and nothing can repoint the message at
+# it. Re-running with --live is therefore idempotent: edit the copy above, run,
+# and the live emails change.
+FLOW_TEMPLATES = {
+    "1.1": "VLaLZm",
+    "1.2": "RYqJVq",
+    "2.1": "Tzz7AA",
+    "2.2": "YfMHcn",
+    "2.3": "XAKEre",
+    "3.1": "SpjLCV",
+    "3.2": "YckWVG",
+}
 
 BRAND = "Torrefazione Nord"
 SITE = "https://negozio-1-om2cqkph.myshopify.com"
@@ -242,49 +264,52 @@ def render_text(email: dict) -> str:
     )
 
 
-def create_template(email: dict, api_key: str, live: bool) -> str | None:
-    body = {
-        "data": {
-            "type": "template",
-            "attributes": {
-                "name": email["name"],
-                "editor_type": "CODE",
-                "html": render_html(email),
-                "text": render_text(email),
-            },
-        }
-    }
-    if not live:
-        print(f"  [dry-run] {email['name']} — {len(body['data']['attributes']['html'])} bytes not sent")
-        return None
+def normalise(html: str) -> str:
+    """Compare what the email says, not how it is marked up.
+
+    Klaviyo rewrites the HTML it stores: `<!doctype>` becomes `<!DOCTYPE>`,
+    `<meta>` gains a closing slash, attributes are reordered and everything is
+    re-indented. Comparing the raw strings reports a difference on every email
+    forever, which trains you to ignore the check.
+    """
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+
+
+def fetch_live(template_id: str, api_key: str) -> str:
     req = urllib.request.Request(
-        API_ROOT,
-        data=json.dumps(body).encode("utf-8"),
+        f"{API_ROOT}/{template_id}",
         headers={
             "Authorization": f"Klaviyo-API-Key {api_key}",
-            "Content-Type": "application/vnd.api+json",
             "Accept": "application/vnd.api+json",
             "revision": API_REVISION,
         },
-        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             payload = json.loads(resp.read() or b"{}")
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:500]
-        sys.exit(f"Klaviyo rejected {email['name']} ({exc.code}): {detail}")
-    tid = payload.get("data", {}).get("id", "created")
-    print(f"  created {email['name']} -> {tid}")
-    return tid
+        detail = exc.read().decode("utf-8", "replace")[:300]
+        sys.exit(f"Could not read template {template_id} ({exc.code}): {detail}")
+    return payload.get("data", {}).get("attributes", {}).get("html", "")
+
+
+def verify(email: dict, api_key: str) -> str | None:
+    """Return a description of the drift, or None when the live email matches."""
+    tid = FLOW_TEMPLATES[email["key"]]
+    live = fetch_live(tid, api_key)
+    if normalise(live) == normalise(render_html(email)):
+        return None
+    if not live:
+        return "the flow message has no content"
+    return "live content differs from this repo"
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--live", action="store_true",
-                   help="actually call Klaviyo; without it nothing leaves the machine")
+    p.add_argument("--verify", action="store_true",
+                   help="read the live flow templates and report any drift")
     p.add_argument("--out", type=Path, default=None,
-                   help="also write the rendered HTML to this directory for review")
+                   help="write the rendered HTML to this directory")
     args = p.parse_args(argv)
 
     if args.out:
@@ -293,20 +318,31 @@ def main(argv: list[str] | None = None) -> int:
             (args.out / f"{e['key']}.html").write_text(render_html(e), encoding="utf-8")
         print(f"HTML written to {args.out}\n")
 
+    if not args.verify:
+        print(f"RENDER ONLY: {len(EMAILS)} emails")
+        for e in EMAILS:
+            print(f"  {e['key']}  {e['name']} — {len(render_html(e))} bytes")
+        print("\nNothing left the machine. Re-run with --verify to compare "
+              "against Klaviyo.")
+        return 0
+
     # Read from the environment, never a flag: a key on the command line ends
-    # up in shell history and in `ps`.
+    # up in shell history and in `ps`. Read scope is enough - this never writes.
     api_key = os.environ.get("KLAVIYO_API_KEY", "")
-    if args.live and not api_key:
-        sys.exit("KLAVIYO_API_KEY is not set - refusing to run --live.")
+    if not api_key:
+        sys.exit("KLAVIYO_API_KEY is not set - refusing to run --verify.")
 
-    print(f"{'LIVE' if args.live else 'DRY RUN'}: {len(EMAILS)} templates")
+    print(f"VERIFY: {len(EMAILS)} flow emails against Klaviyo")
+    drift = 0
     for e in EMAILS:
-        create_template(e, api_key, args.live)
-
-    if not args.live:
-        print("\nNothing was sent. Re-run with --live to create them in Klaviyo.")
-    else:
-        print("\nNow assign each one: Flows -> flow -> email -> Change template.")
+        problem = verify(e, api_key)
+        drift += bool(problem)
+        print(f"  {e['key']}  {'matches' if not problem else 'DRIFT: ' + problem}")
+    if drift:
+        print(f"\n{drift} email(s) do not match this repo. Paste the rendered "
+              "HTML into the flow message - see docs/first-cycle.md.")
+        return 1
+    print("\nEvery flow email matches the copy in this repo.")
     return 0
 
 

@@ -7,6 +7,8 @@ Run from the repository root:
 
 from __future__ import annotations
 
+import contextlib
+import io
 import re
 import sys
 import unittest
@@ -102,20 +104,33 @@ class TestClaimsMatchTheStore(unittest.TestCase):
             self.assertIn("un solo utilizzo per cliente", text)
 
 
-class TestPushSafety(unittest.TestCase):
-    """A dry run must never reach the network."""
+class TestFlowTemplateIds(unittest.TestCase):
+    def test_every_email_targets_a_flow_template(self):
+        # A missing id silently creates an orphan template that no flow points
+        # at, and the send goes out with the old copy.
+        for e in bt.EMAILS:
+            with self.subTest(e["key"]):
+                self.assertIn(e["key"], bt.FLOW_TEMPLATES)
+        self.assertEqual(len(set(bt.FLOW_TEMPLATES.values())), len(bt.EMAILS))
+
+
+class TestNetworkSafety(unittest.TestCase):
+    """Rendering must never reach the network."""
 
     def setUp(self):
         real = urllib.request.urlopen
 
         def explode(*_a, **_k):
-            raise AssertionError("dry run opened a socket")
+            raise AssertionError("rendering opened a socket")
 
         urllib.request.urlopen = explode
         self.addCleanup(setattr, urllib.request, "urlopen", real)
 
-    def test_dry_run_sends_nothing(self):
-        self.assertIsNone(bt.create_template(bt.EMAILS[0], "key", live=False))
+    def test_default_run_opens_no_socket(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(bt.main([]), 0)
+        self.assertIn("Nothing left the machine", out.getvalue())
 
 
 if __name__ == "__main__":
