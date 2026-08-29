@@ -32,9 +32,9 @@ here I *operate* on them. The bridge between the two is
 | Flow 3 Win-back — 3.1 (Day 0) → Wait 7 days → 3.2 (Day 7) | done, Draft |
 | Smart Sending + UTM tracking on all seven emails | done |
 | Copy for all seven emails | done — [`docs/email-copy.md`](docs/email-copy.md) |
+| Sign-up form, live — Italian, flyout, consent required to submit | done |
+| Shopify return rule, matching what the copy promises | done — 30 days, free return shipping, 0% restocking |
 | Visual templates assembled in the editor | **not done** — copy is written, layout is not |
-| Sign-up form published on the storefront | **not done** — the list has no members until it exists |
-| Product claims in the copy (48h shipping, 14-day returns) | **placeholders** — align to reality before any send |
 
 ## Recruiter 5-minute route
 
