@@ -14,8 +14,9 @@ here I *operate* on them. The bridge between the two is
 > triggers, filters, delays, seven emails, tracking — are built, and the email
 > templates are generated from code. Every flow is **Draft**: nothing sends,
 > and the list has no subscribers. The results section fills in after the first
-> full cycle. See
-> [Boundaries](#boundaries) for exactly what is real here and what is not.
+> full cycle — [`docs/first-cycle.md`](docs/first-cycle.md) is the procedure for
+> running it. See [Boundaries](#boundaries) for exactly what is real here and
+> what is not.
 
 ## What is set up
 
