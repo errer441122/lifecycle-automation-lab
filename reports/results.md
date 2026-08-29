@@ -77,10 +77,11 @@ which is the only path that can grant consent.
 
 | Flow | Entered | Delivered | Opened | Clicked | Orders | Unsub | Complaints |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Welcome — 1.1 | 1 | 1 | — | — | 0 | 0 | 0 |
+| Welcome — 1.1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | Welcome — 1.2 | pending (Day 3) | | | | | | |
-| Abandoned cart — 2.1 | 1 | due 20:45 UTC | | | | | |
-| Abandoned cart — 2.2/2.3 | pending (+20h, +2d) | | | | | | |
+| Abandoned cart — 2.1 | 1 | **0 — skipped** | | | | | |
+| Abandoned cart — 2.2 | waiting | due 16:45 UTC, 30 Aug | | | | | |
+| Abandoned cart — 2.3 | pending (+2d) | | | | | | |
 | Win-back | cannot run before December | | | | | | |
 
 One delivery. That is a mechanism working, not a measurement — see the section
@@ -107,8 +108,12 @@ opt-in doing its job: the profile existed and had marketing consent from
 
 `Source Name: web` is the part that matters: the event came from Shopify's
 checkout webhook on the storefront, not from anything constructed in the
-admin. Delivery of 2.1 is due at 20:45 UTC, four hours later, and is recorded
-above as due rather than as delivered.
+admin.
+
+**2.1 was never sent.** The profile entered the flow, waited the four hours,
+and the send was skipped — see *Smart Sending ate the cart email* below. 2.2
+is queued behind the 20-hour delay and due at 16:45 UTC on 30 August, by which
+point the window that suppressed 2.1 has passed.
 
 **The exit condition has still not been observed suppressing a send**, and one
 cart cannot show both. The condition is re-evaluated before every send, so any
@@ -265,6 +270,45 @@ storefront actually backs, and a test fails if any duration in the copy is not
 in it. `TORNA15` was created in Shopify so the offer is real, and the copy now
 states the terms the discount has.
 
+### Smart Sending ate the cart email, and only one screen says so
+
+The most useful thing that happened in this project, and it took a real send
+to find.
+
+```
+17:47 (Rome)  Received Email   "Benvenuto in Torrefazione Nord"
+18:45         Checkout Started  Colombia Huila 250g, Source Name: web
+22:45         2.1 due  ->  Delivered 0 · Skipped 1
+              Recipient activity -> Skipped -> "Skipped: Smart Sending (1)"
+```
+
+Four hours and fifty-nine minutes separated the welcome email from the cart
+email. Klaviyo's Smart Sending suppresses a send to anyone who has already
+received an email inside a rolling window — 16 hours by default — so the cart
+email was dropped. Smart Sending is on by default and was left on, deliberately,
+on all seven messages.
+
+**This is not a bug. It is the feature working, and costing a conversion.** On
+a large list the two flows rarely collide, because a subscriber who joined
+this morning is not usually abandoning a cart this afternoon. On a list of one
+— and on any list of early, enthusiastic subscribers — that is exactly the
+sequence, and the cart email is the one that loses.
+
+**What it cost to find:** nothing in the API says it happened. No
+`Received Email`, and no `Skipped Send` event either — the `Skipped Send`
+metric exists in the account and returned zero events. The event stream simply
+goes quiet. The one place the skip is visible is the message's
+*Recipient activity -> Skipped*, which names the reason.
+
+**What changed as a result:** the trade-off is now a decision instead of a
+default. Three options, and the reason for the choice matters more than the
+choice: shorten the Smart Sending window; turn Smart Sending off for 2.1 only,
+on the argument that a cart email is closer to transactional than to
+promotional; or leave it and accept that a same-day subscriber loses the first
+cart touch and gets 2.2 instead. This project leaves it on and reports the
+skip, because a portfolio that silences an inconvenient safeguard is worth
+less than one that explains it.
+
 ### An abandoned cart cannot be manufactured from the Shopify admin
 
 The obvious way to trigger the cart flow without touching a storefront is a
@@ -306,7 +350,12 @@ the expensive way.
 
 ## What I would do next
 
-**First, close the consent leak.** The Shopify integration can write
+**First, decide the Smart Sending trade-off** — it is the only finding here
+that changed an outcome rather than a document. Measure how often welcome and
+cart windows actually overlap before choosing, because on a real list the
+answer is probably "rarely", and the fix costs a safeguard.
+
+**Then close the consent leak.** The Shopify integration can write
 `SUBSCRIBED` profiles into a list without a confirmation. Either point the
 integration at a list no flow reads, or stop syncing marketing consent from
 Shopify entirely and let the form be the only writer. This is a correctness

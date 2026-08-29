@@ -9,15 +9,18 @@ This is the companion to that analysis: there I *measure* lifecycle and RFM,
 here I *operate* on them. The bridge between the two is
 [`src/sync_klaviyo.py`](src/sync_klaviyo.py).
 
-> **Status (2026-08-29).** Two of the three flows have been entered by real
+> **Status (2026-08-30).** Two of the three flows have been entered by real
 > events. Welcome: consent given on the form, confirmed by clicking the link,
-> email delivered 47 seconds later. Abandoned cart: a real storefront checkout
-> at 16:45 UTC, `Source Name: web`, first email due four hours after. One
-> subscriber and one cart — a working mechanism, not a measurement. The
-> win-back cannot produce data before December and that is stated rather than
-> worked around. Numbers, and the six things that broke on the way, are in
-> [`reports/results.md`](reports/results.md); see [Boundaries](#boundaries) for
-> what is real here and what is not.
+> email delivered 47 seconds later, opened 90 minutes after that. Abandoned
+> cart: a real storefront checkout, `Source Name: web` — and the first cart
+> email **was skipped by Smart Sending**, because the welcome had gone out five
+> hours earlier and that is inside the window. Not a bug; the feature working,
+> and costing a conversion. It is the most useful thing in
+> [`reports/results.md`](reports/results.md), along with the six other things
+> that broke. One subscriber and one cart — a working mechanism, not a
+> measurement. The win-back cannot produce data before December and that is
+> stated rather than worked around. See [Boundaries](#boundaries) for what is
+> real here and what is not.
 
 ## What is set up
 
@@ -34,7 +37,8 @@ here I *operate* on them. The bridge between the two is
 | Flow 1 Welcome | **Live** — 1.1 (Day 0) → wait 3 days → 1.2 (Day 3) |
 | Flow 2 Abandoned cart | **Live** — exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 |
 | Flow 3 Win-back | 3.1 (Day 0) → wait 7 days → 3.2 (Day 7) |
-| Every email | Content live, Smart Sending and UTM tracking on, sender *Torrefazione Nord* |
+| Every email | Content live, UTM tracking on, sender *Torrefazione Nord* |
+| Smart Sending | On, left on deliberately — it skipped the first cart email and that is reported rather than switched off |
 
 ## Recruiter 5-minute route
 
