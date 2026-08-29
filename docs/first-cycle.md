@@ -5,8 +5,8 @@ is not a missing setting.
 
 | Why nothing has happened | Fixed by |
 | --- | --- |
-| The list has no subscribers, because the storefront is password-locked and consent cannot be given on someone's behalf | Step 1 |
-| All three flows are in Draft | Steps 2-3 |
+| All three flows are in Draft, and a flow is not retroactive | Step 1 |
+| The list has no subscribers, because consent cannot be given on someone's behalf | Step 2 |
 
 Do these in order. Activating a flow before checking its content sends to a
 real inbox, and that is not recoverable.
@@ -33,29 +33,42 @@ render it twice, so that field is deliberately left empty.
 change: `python src/build_templates.py --out build/`, paste the changed file
 into the flow message's code editor, then `--verify` to prove it took.
 
-## 1. Become the first subscriber
-
-The storefront needs the store password — Shopify forces password protection on
-development stores and the toggle cannot be turned off. Get it from Online
-store → Preferences.
-
-Open the storefront, wait for the flyout, and submit with an address you can
-actually read. Then **click the confirmation link in the email**. Without that
-click the profile stays unconfirmed and enters nothing, which is the whole point
-of the design.
-
-The list should now read 1. Check the profile: consent recorded, source
-recorded.
-
-## 2. Activate the welcome flow
+## 1. Activate the welcome flow — before subscribing
 
 Flow 1 → **Update status** → Live.
 
-Email 1.1 should arrive within minutes. Email 1.2 arrives three days later.
+**The order matters and it is the opposite of what feels natural.** A Klaviyo
+flow is not retroactive: it only takes in profiles that trigger it *after* it
+went live. Subscribe first and the confirmation lands, the profile joins the
+list, and nothing else happens — no welcome email, no error, nothing to look
+at. It reads exactly like a broken flow.
 
-Do not activate anything before this point. Watch what 1.1 actually looks like
-in a real client — not in Klaviyo's preview, which renders in a browser and
-tells you nothing about Outlook.
+Activating now is safe because the content is in and checked
+(`python src/build_templates.py --verify`). Activating an empty flow is what
+sends *"It's time to design"* to a real inbox.
+
+## 2. Become the first subscriber
+
+The storefront is the shop itself, not the admin:
+<https://negozio-1-om2cqkph.myshopify.com>. It asks for a password before
+showing anything — Shopify forces that on development stores and the toggle
+cannot be turned off. The password is in Shopify → Negozio online →
+Preferenze.
+
+The form is *Newsletter sign-up (double opt-in)*, a flyout, already **Live**
+with 0 submissions. Wait a few seconds on the page, enter an address you can
+actually open, tick the consent box, submit.
+
+Then **click the confirmation link in the email**. This is the step the whole
+project is about: until that click the profile is `unconfirmed`, it is not on
+the list, and it enters no flow. Double opt-in is not a delay before the real
+subscription — it *is* the subscription.
+
+The list should now read 1. Check the profile: consent recorded, source
+recorded. Email 1.1 arrives within minutes; 1.2 three days later.
+
+Watch 1.1 in a real client — not in Klaviyo's preview, which renders in a
+browser and tells you nothing about Outlook.
 
 ## 3. Trigger the abandoned cart
 
