@@ -1,0 +1,159 @@
+# Lifecycle Automation Lab
+
+Consent-first e-commerce lifecycle automation, running on a live store with
+real events. Three flows in Klaviyo (welcome with double opt-in, abandoned
+cart, win-back), triggered by lifecycle segments computed with the same rules
+as my [CRM analysis repo](https://github.com/errer441122/digital-campaign-performance-dashboard).
+
+This is the companion to that analysis: there I *measure* lifecycle and RFM,
+here I *operate* on them. The bridge between the two is
+[`src/sync_klaviyo.py`](src/sync_klaviyo.py).
+
+> **Status (2026-08-29).** Store, ESP, sending-domain authentication, sender
+> identity, consent settings, the lifecycle segment and all three flows —
+> triggers, filters, delays, seven emails, tracking — are built. Every flow is
+> **Draft**: nothing sends. Copy is written; the visual templates are not
+> assembled. The results section fills in after the first full cycle. See
+> [Boundaries](#boundaries) for exactly what is real here and what is not.
+
+## Build status
+
+| Piece | State |
+| --- | --- |
+| Shopify store, 8 products, 3 seeded orders | done |
+| Klaviyo ↔ Shopify integration, onsite embed active | done |
+| List *Newsletter (double opt-in)* (`WZDGDT`), double opt-in on, global unsubscribe | done |
+| Sending domain `send.negozio-online.org` — NS delegation, DKIM, DMARC | done, verified via `nslookup` |
+| Sender identity — *Torrefazione Nord* `<caffe@negozio-online.org>`, applied to every flow email | done |
+| Account language `it-IT`, timezone `Europe/Rome` | done |
+| Segment *At risk (lifecycle_stage)* (`TFJaA4`) | done — 0 members, which is correct: nobody is at risk yet |
+| Flow 1 Welcome — Email 1.1 (Day 0) → Wait 3 days → Email 1.2 (Day 3) | done, Draft |
+| Flow 2 Abandoned cart — exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 | done, Draft |
+| Flow 3 Win-back — 3.1 (Day 0) → Wait 7 days → 3.2 (Day 7) | done, Draft |
+| Smart Sending + UTM tracking on all seven emails | done |
+| Copy for all seven emails | done — [`docs/email-copy.md`](docs/email-copy.md) |
+| Visual templates assembled in the editor | **not done** — copy is written, layout is not |
+| Sign-up form published on the storefront | **not done** — the list has no members until it exists |
+| Product claims in the copy (48h shipping, 14-day returns) | **placeholders** — align to reality before any send |
+
+## Recruiter 5-minute route
+
+1. [`docs/flows.md`](docs/flows.md) — the three flows: trigger, branches,
+   timing, exit conditions, and the segment each one reads.
+2. The screenshots below — the flows as they actually exist in the ESP.
+3. [`docs/consent.md`](docs/consent.md) — double opt-in, lawful basis,
+   suppression, and why the sync script cannot grant consent.
+4. [`reports/results.md`](reports/results.md) — what happened and what I would
+   change next.
+
+## The flows
+
+| # | Flow | Trigger | Steps | What it demonstrates |
+| --- | --- | --- | --- | --- |
+| 1 | Welcome | Signup form submission, confirmed | 3 | Double opt-in, consent source captured, suppression respected |
+| 2 | Abandoned cart | `Checkout Started` without `Placed Order` | 3 | Event-driven timing, conditional split, exit on purchase |
+| 3 | Win-back | Entry into the `At risk` lifecycle segment | 2 | Analysis output driving an actual send |
+
+Full specification in [`docs/flows.md`](docs/flows.md).
+
+## Screenshots
+
+<!-- Capture each screen, save it under the given filename, then replace the
+     row with an image embed and delete this comment. -->
+
+Every screen below exists now. Capture each one, save it under the given
+filename, then replace the row with an image embed.
+
+| Shot | File | Where |
+| --- | --- | --- |
+| Welcome flow canvas | `assets/flow-welcome.png` | Klaviyo → Flows → *1 - Welcome (double opt-in)* |
+| Abandoned cart canvas | `assets/flow-abandoned-cart.png` | Klaviyo → Flows → *2 - Abandoned cart* |
+| Win-back canvas | `assets/flow-winback.png` | Klaviyo → Flows → *3 - Win-back (At risk)* |
+| Abandoned-cart exit condition | `assets/flow-exit-condition.png` | Flow 2 → Trigger → Profile filters — the single most instructive shot in the set |
+| `At risk` segment definition | `assets/segment-at-risk.png` | Klaviyo → Lists & segments → *At risk (lifecycle_stage)* → Edit definition |
+| Double opt-in enforced on the list | `assets/klaviyo-double-optin.png` | Klaviyo → Lists → *Newsletter (double opt-in)* → Settings → Consent |
+| Shopify integration connected | `assets/klaviyo-shopify-integration.png` | Klaviyo → Integrations → Shopify |
+| Catalogue and inventory | `assets/shopify-products.png` | Shopify → Prodotti |
+| Seeded orders | `assets/shopify-orders.png` | Shopify → Ordini |
+| DNS authentication | `assets/dns-auth.png` | Terminal — `nslookup` output, not the vendor dashboard. See [deliverability](docs/deliverability.md) for why |
+
+The last row is deliberate. After the wildcard incident documented in
+[`reports/results.md`](reports/results.md), screenshotting a green tick in a
+vendor UI is exactly the wrong evidence; the DNS answers are the evidence.
+
+## The bridge: analysis output to ESP segment
+
+The lifecycle model does not live in the ESP. It is computed from order
+history and pushed onto the profile as a property, which a Klaviyo segment
+then reads, which in turn triggers the flow:
+
+```
+orders export  ─┐
+                ├─►  sync_klaviyo.py  ─►  profile property        ─►  Klaviyo segment  ─►  flow
+consent export ─┘    (hard consent gate)   lifecycle_stage="At risk"   "At risk"          win-back
+```
+
+Same thresholds as the analysis repo, deliberately duplicated rather than
+imported, so this repo runs standalone:
+
+| Stage | Rule |
+| --- | --- |
+| New | last order ≤ 90 days ago, 1 order |
+| Repeat | last order ≤ 90 days ago, ≥ 2 orders |
+| At risk | last order 91–180 days ago |
+| Dormant | last order 181–365 days ago |
+| Churned | last order > 365 days ago |
+
+### Run it
+
+No third-party packages — Python standard library only.
+
+```bash
+python -m unittest discover -s tests
+```
+
+```bash
+python src/sync_klaviyo.py --as-of 2026-06-01
+```
+
+That is a **dry run**: it prints the suppression report and writes
+`reports/sync_report.json` without opening a socket. On the bundled example
+data it resolves 7 customers into 5 eligible profiles across all five stages,
+suppressing one `opted_out` and one with no consent record at all.
+
+To sync for real, set the key in the environment (never as a CLI flag — a
+private key on the command line lands in shell history) and pass `--live`:
+
+```bash
+export KLAVIYO_API_KEY=pk_xxx && python src/sync_klaviyo.py --orders data/orders.csv --consent data/consent.csv --list-id ABC123 --live
+```
+
+## Deliverability
+
+Authenticating the sending domain is part of the build, not an afterthought:
+SPF, DKIM and DMARC records, the warm-up schedule and the list-hygiene rules
+are documented in [`docs/deliverability.md`](docs/deliverability.md).
+
+## Boundaries
+
+- **The mechanism is real; the volume is not.** This runs on a development
+  store with a small list of people who each gave explicit double opt-in
+  consent. Open and click rates at this sample size are **not statistically
+  meaningful** and are reported as counts, never as rates presented as
+  benchmarks.
+- **No purchased, scraped, or imported lists.** Every recipient opted in
+  through the form documented in `docs/consent.md`.
+- **The sync script never grants consent.** A bulk profile import writes
+  profile data; it does not subscribe anyone to marketing. Consent comes from
+  the double opt-in form only, and the script refuses to touch a profile that
+  is not already opted in.
+- **No email addresses are invented.** The public dataset behind the analysis
+  repo (UCI *Online Retail II*) is anonymous — customer ids, no contacts —
+  which is precisely why its customers are not synced here. Only the
+  segmentation *rules* cross over.
+- The example CSVs in `data/` use `example.com` addresses, which are reserved
+  by RFC 2606 and cannot receive mail.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).

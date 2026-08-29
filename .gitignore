@@ -1,0 +1,8 @@
+# Real exports never get committed - only the example files do.
+data/orders.csv
+data/consent.csv
+reports/sync_report.json
+.env
+__pycache__/
+*.pyc
+.venv/

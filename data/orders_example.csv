@@ -1,0 +1,13 @@
+email,order_date,order_value_eur
+new@example.com,2026-05-20,49.90
+repeat@example.com,2026-01-14,120.00
+repeat@example.com,2026-03-02,85.50
+repeat@example.com,2026-05-25,64.00
+atrisk@example.com,2025-09-10,210.00
+atrisk@example.com,2026-02-01,95.00
+dormant@example.com,2025-04-18,310.00
+dormant@example.com,2025-11-01,150.00
+churned@example.com,2024-12-01,72.00
+optedout@example.com,2026-05-28,880.00
+optedout@example.com,2026-04-02,640.00
+noconsent@example.com,2026-05-11,55.00
