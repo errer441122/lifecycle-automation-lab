@@ -1,8 +1,9 @@
 # Results
 
-> **Template — fill in after the first full cycle.** Every `TODO` below is a
-> placeholder. Publishing this file with the placeholders still in it is worse
-> than not publishing it at all.
+> **First cycle ran on 2026-08-29.** The welcome path is closed end to end:
+> consent given, confirmed, flow triggered, email delivered. The cart and
+> win-back paths have not run — see *Flow activity* for why, stated rather than
+> estimated.
 
 ## Setup
 
@@ -11,11 +12,11 @@
 | Store | Shopify development store, 8 products (specialty coffee), 3 seeded orders |
 | Store currency | USD — the store sits on a United States market. Prices read as `$` in every screenshot; switch the market to Italy/EUR in Settings → Markets and re-create the orders if that matters for the write-up |
 | ESP | Klaviyo, free plan, connected to the store since 2026-08-27 |
-| Sending domain | `send.negozio-online.org` — NS delegation live, DKIM published, DMARC `p=none` |
+| Sending domain | `send.negozio-online.org` — **Active**, NS delegation live, DKIM published, DMARC `p=none` |
 | List | *Newsletter (double opt-in)* (`WZDGDT`), double opt-in on, unsubscribe global |
 | Segment | *At risk (lifecycle_stage)* (`TFJaA4`), 0 members |
-| List size | 0 consenting profiles — the form has not been published yet |
-| Period observed | not started — every flow is Draft |
+| List size | 1 consenting profile, confirmed through double opt-in |
+| Period observed | from 2026-08-29 15:46 UTC — one welcome cycle |
 
 ### Seeded orders
 
@@ -60,30 +61,58 @@ From `reports/sync_report.json`:
 
 | | Count |
 | --- | --- |
-| Customers in orders export | TODO |
-| Eligible after consent gate | TODO |
-| Suppressed — `opted_out` | TODO |
-| Suppressed — `unknown` | TODO |
-| `New` / `Repeat` / `At risk` / `Dormant` / `Churned` | TODO |
+| Customers in orders export | 2 |
+| Eligible after consent gate | **0** |
+| Suppressed — `opted_out` | 0 |
+| Suppressed — `unknown` | 2 |
+| `New` / `Repeat` / `At risk` / `Dormant` / `Churned` | 0 / 0 / 0 / 0 / 0 |
+
+Zero eligible is the expected result, not a failure. Both customers were
+created in the Shopify admin with the marketing checkbox left unticked, so the
+gate suppresses them and the script exits without opening a socket. The one
+profile that *is* on the list did not come from here — it came from the form,
+which is the only path that can grant consent.
 
 ## Flow activity
 
 | Flow | Entered | Delivered | Opened | Clicked | Orders | Unsub | Complaints |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Welcome | TODO | | | | | | |
-| Abandoned cart | TODO | | | | | | |
-| Win-back | TODO | | | | | | |
+| Welcome — 1.1 | 1 | 1 | — | — | 0 | 0 | 0 |
+| Welcome — 1.2 | pending (Day 3) | | | | | | |
+| Abandoned cart | not activated yet | | | | | | |
+| Win-back | cannot run before December | | | | | | |
+
+One delivery. That is a mechanism working, not a measurement — see the section
+above.
+
+```
+15:41:33  Subscribed to List -> Email List                  (Shopify webhook, wrong list)
+15:44:4x  subscribe_page_view  x3
+15:46:31  Subscribed to List -> Newsletter (double opt-in)   (confirmation clicked)
+15:47:18  Received Email -> "Benvenuto in Torrefazione Nord" (flow SQbmHb)
+```
+
+**47 seconds** from the confirmation click to delivery, and five minutes
+between landing on the consent page and confirming. That gap is the double
+opt-in doing its job: the profile existed and had marketing consent from
+15:41, and still received nothing until it confirmed for *this* list.
+
+The win-back cannot produce data until roughly December: it triggers on entry
+to `At risk`, which needs 91+ days since the last order, and the seeded orders
+are days old. `--as-of` exercises the model against a stated reference date,
+which is a disclosure, not a substitute for elapsed time.
 
 ## Authentication
 
 | Check | Result |
 | --- | --- |
-| SPF | TODO |
-| DKIM | TODO |
-| DMARC (`p=`) | TODO |
-| `List-Unsubscribe` one-click | TODO |
+| SPF | served by Klaviyo inside the delegated `send.` zone — dynamic routing, so it never appears in Cloudflare |
+| DKIM | `s1._domainkey.send.negozio-online.org` -> `s1.domainkey.u161779.wl030.sendgrid.net`, resolving |
+| DMARC (`p=`) | `v=DMARC1; p=none;`, resolving, no `rua=` yet |
+| `List-Unsubscribe` one-click | **open** — needs the raw headers of the delivered email, not the dashboard |
 
-Raw headers from a seed send, not the ESP dashboard's own verdict.
+Verified with `nslookup` against `8.8.8.8`, not against the ESP's own status
+column. The reason for that rule is the first incident below.
 
 ## What broke
 
@@ -129,16 +158,126 @@ answer was yours. The `_dmarc` value is also a tell in hindsight: a real DMARC
 record starts `v=DMARC1`, not `v=spf1`, so the value in the "verified" row was
 never a valid DMARC policy in the first place.
 
-**Still open:** a branded sending domain needs a registered domain. Flows run on
-Klaviyo's shared sending domain until then — see
-[`../docs/deliverability.md`](../docs/deliverability.md).
+**Resolved:** the real domain was `negozio-online.org`, already on Cloudflare
+with correct records. Klaviyo had been pointed at the wrong one because it
+prefills the domain field from account settings.
+
+### Verified is not Active, and nothing says so
+
+With the DNS correct, `send.negozio-online.org` sat in Klaviyo reading
+*"created but has not started verification yet"* for a day. Verification had to
+be started by hand. Then, once **Verified**, it still had to be **Activated** —
+a second, separate action.
+
+**What it cost:** nothing, because it was caught before the first send. Had it
+not been, every email would have gone out on Klaviyo's shared sending domain
+while the dashboard showed a verified branded domain, and no send report would
+have mentioned it.
+
+**What changed as a result:** "domain configured" is not a state worth
+recording. The states that matter are Verified *and* Active, and both are now
+in [`../docs/deliverability.md`](../docs/deliverability.md).
+
+### Consent arrived on a list that nothing reads
+
+The first attempt to subscribe produced a subscriber, and the welcome flow
+still did not fire. The profile was real, consenting, and on the wrong list:
+
+```
+consent            SUBSCRIBED
+method             SHOPIFY / Customer Webhook
+list               Email List          <- Klaviyo integration default
+consent_timestamp  15:30:36.655
+webhook event      15:30:36.569
+```
+
+86 milliseconds between the webhook and the consent record: no confirmation
+link was clicked, because none was sent. The subscription had gone through
+Shopify's own newsletter field, Shopify created a customer with
+`accepts_marketing`, and the Klaviyo integration wrote that straight into its
+default list — bypassing the flyout entirely. The destination list is itself
+marked double opt-in, and it made no difference.
+
+**What it cost:** a subscriber who looked correct in every summary view and
+triggered nothing.
+
+**What changed as a result:** double opt-in on a list protects the path that
+goes through the form. It does not protect the list. Any integration with
+write access can put a `SUBSCRIBED` profile on it without a confirmation, so
+the list a flow reads has to be one that only the form writes to. Worth saying
+plainly in an interview: the setting was on, correctly, and it still did not do
+what its name suggests.
+
+### A form that was live, correct, and never rendered
+
+The flyout was Live, published, submitting to the right list, with no URL,
+location, device or UTM restrictions and a permissive display rule (exit
+intent **or** 5 seconds **or** 30% scroll, `all conditions` off). The Klaviyo
+app embed was on in the theme, onsite tracking was enabled, and
+`klaviyo.js?company_id=VgsrdN` served the `signup_forms` bundles.
+
+**Submits: 0. Viewed form: 0.** Not "shown and ignored" — never rendered.
+
+The unblock was Klaviyo's hosted consent page, which needs no storefront, no
+theme embed and no store password, and honours the same double opt-in. That is
+what produced the subscriber above.
+
+**Still open:** why the flyout does not render. The two candidates are the
+theme-editor preview, where onsite scripts do not run, and Shopify's password
+page, which app embeds are not executed on.
+
+### Copy that promised what the store could not deliver
+
+Two claims survived every read-through because they are well written:
+
+- *"Spedizione in 48 ore in tutta Italia"* — the store publishes no shipping
+  rate carrying a delivery estimate. The promise existed only in the email.
+- *"Valido 14 giorni"* on the win-back code — a win-back flow runs
+  continuously and each profile enters on a different day, so one static code
+  cannot carry a per-recipient 14-day window.
+
+The second is the more interesting error: it is not a typo, it is a claim that
+is incoherent with the mechanism sending it.
+
+**What changed as a result:** `STORE_FACTS` in
+[`../src/build_templates.py`](../src/build_templates.py) records what the
+storefront actually backs, and a test fails if any duration in the copy is not
+in it. `TORNA15` was created in Shopify so the offer is real, and the copy now
+states the terms the discount has.
+
+### Smaller ones, without the write-up
+
+- Setting the account sender does not propagate to flow messages that already
+  exist. Three of seven still read **"Azienda"** as the from-name.
+- A flow's status and its messages' statuses are separate. A Live flow whose
+  messages are Draft sends nothing and looks fine.
+- Klaviyo serves a flow message's template on `GET /api/templates/{id}` and
+  answers `404` to `PATCH` on the same id; `PATCH /api/flow-messages/{id}` is
+  `405`. Content goes in by hand. `--verify` exists because of this.
+- A flow is not retroactive. Subscribing before activating produces a
+  subscriber and no email, which reads exactly like a broken flow.
 
 ## What I would do next
 
-TODO — the specific next change and the test that would settle it, not a list
-of features. For example: which of the 4h / 20h / 48h abandoned-cart delays to
-test first and why, and how many sends it would take to detect a difference
-worth acting on.
+**First, close the consent leak.** The Shopify integration can write
+`SUBSCRIBED` profiles into a list without a confirmation. Either point the
+integration at a list no flow reads, or stop syncing marketing consent from
+Shopify entirely and let the form be the only writer. This is a correctness
+fix, not an optimisation, and it comes before any test.
+
+**Then, the 4h first-touch delay.** It is the one decision in
+[`../docs/flows.md`](../docs/flows.md) with the weakest justification: 4 hours
+was chosen to catch the same browsing session, and 1 hour is just as defensible.
+It is also the cheapest to test, since it changes one number and needs no new
+content.
+
+The honest part is the arithmetic. Detecting a 2-point difference in recovery
+rate at a plausible baseline needs on the order of a few thousand carts per
+arm. This store will never produce that. So the correct thing to do here is
+**not** to run the test and report a winner — it is to state the delay as a
+documented choice with its reasoning, and note the sample size at which it
+would become answerable. A portfolio project that reports a significant result
+from twelve sends is telling you something about the author, not the delay.
 
 ## Cost
 
@@ -146,5 +285,5 @@ worth acting on.
 | --- | --- |
 | Shopify development store | €0 |
 | ESP free plan | €0 |
-| Domain | TODO — ~€10/year |
-| **Total** | **TODO** |
+| Domain | `negozio-online.org`, Cloudflare — ~€10/year |
+| **Total** | **~€10/year** |

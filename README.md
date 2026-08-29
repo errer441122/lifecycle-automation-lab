@@ -9,16 +9,14 @@ This is the companion to that analysis: there I *measure* lifecycle and RFM,
 here I *operate* on them. The bridge between the two is
 [`src/sync_klaviyo.py`](src/sync_klaviyo.py).
 
-> **Status (2026-08-29).** Everything is built: store, ESP, an **Active**
-> sending domain, sender identity, consent settings, the lifecycle segment, and
-> all three flows — triggers, filters, delays, tracking, and seven emails whose
-> content is generated from code and **verified against this repo**
-> (`python src/build_templates.py --verify`). What has not happened is a send:
-> every flow is **Draft** and the list has no subscribers, because subscribing
-> is an act of consent that only a person can perform. The results section
-> fills in after the first full cycle —
-> [`docs/first-cycle.md`](docs/first-cycle.md) is the procedure. See
-> [Boundaries](#boundaries) for exactly what is real here and what is not.
+> **Status (2026-08-29).** The welcome path has run end to end: consent given
+> on the form, confirmed by clicking the link, flow triggered, email delivered
+> — 47 seconds from confirmation to inbox. One subscriber, which is a working
+> mechanism and not a measurement. The abandoned-cart flow is next; the
+> win-back cannot produce data before December and that is stated rather than
+> worked around. Numbers and the five things that broke on the way are in
+> [`reports/results.md`](reports/results.md); see
+> [Boundaries](#boundaries) for what is real here and what is not.
 
 ## What is set up
 
@@ -26,13 +24,13 @@ here I *operate* on them. The bridge between the two is
 | --- | --- |
 | Store | Shopify, 8 products, 3 seeded orders, integrated with Klaviyo |
 | List | *Newsletter (double opt-in)* — `WZDGDT`, double opt-in on, unsubscribe global |
-| Segment | *At risk (lifecycle_stage)* — `TFJaA4` |
+| Segment | *At risk (lifecycle_stage)* — `TFJaA4`, 0 members until December |
 | Sign-up form | Flyout, Italian, consent required to submit |
 | Win-back offer | `TORNA15` — 15% off order, one use per customer, active |
 | Sender | *Torrefazione Nord* `<caffe@negozio-online.org>` |
 | Sending domain | `send.negozio-online.org` — NS delegation, DKIM, DMARC, **Active** |
 | Account | `it-IT`, `Europe/Rome` |
-| Flow 1 Welcome | 1.1 (Day 0) → wait 3 days → 1.2 (Day 3) |
+| Flow 1 Welcome | **Live** — 1.1 (Day 0) → wait 3 days → 1.2 (Day 3) |
 | Flow 2 Abandoned cart | exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 |
 | Flow 3 Win-back | 3.1 (Day 0) → wait 7 days → 3.2 (Day 7) |
 | Every email | Content live, Smart Sending and UTM tracking on, sender *Torrefazione Nord* |
