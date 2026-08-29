@@ -41,6 +41,19 @@ API_REVISION = "2026-07-15"
 BRAND = "Torrefazione Nord"
 SITE = "https://negozio-1-om2cqkph.myshopify.com"
 
+# What the storefront actually backs, read off the Shopify settings rather than
+# assumed. Copy that states something about the store has to match this, or the
+# email is writing a cheque the checkout will not cash — the failure nobody
+# catches in review, because the copy reads perfectly well on its own.
+STORE_FACTS = {
+    "returns_days": 30,           # Settings -> Policies, free returns
+    "guest_checkout": True,       # Settings -> Checkout
+    "winback_code": "TORNA15",    # Discounts, active, 15% off order
+    "winback_percent": 15,
+    "winback_once_per_customer": True,
+    "shipping_sla": None,         # no rate with a delivery estimate is published
+}
+
 # Copy mirrors docs/email-copy.md. Kept as data rather than parsed out of the
 # markdown: a parser tied to heading levels breaks the moment the document is
 # reorganised, and the document is written for people, not for a machine.
@@ -100,15 +113,16 @@ EMAILS: list[dict] = [
     {
         "key": "2.2",
         "name": "2.2 Rassicurazione - spedizione e resi",
-        "preheader": "Spedizione in 48h e reso gratuito entro 30 giorni.",
+        "preheader": "Reso gratuito entro 30 giorni, e nessun account da creare.",
         "heading": "Ti e rimasto un dubbio?",
         "body": [
-            "<b>Quanto ci mette?</b> 48 ore in tutta Italia. Tostiamo il lunedi "
-            "e il giovedi, quindi il caffe che ricevi ha meno di una settimana.",
             "<b>E se non mi piace?</b> Reso gratuito entro 30 giorni, spedizione "
             "di reso a carico nostro. Il caffe e questione di gusti, non ha "
             "senso far finta di no.",
-            "<b>Devo creare un account?</b> No, puoi ordinare come ospite.",
+            "<b>Devo creare un account?</b> No, puoi ordinare come ospite: "
+            "bastano un indirizzo email e uno di consegna.",
+            "<b>Quanto costa la spedizione?</b> Te lo diciamo al check-out, "
+            "prima del pagamento. Nessun costo che compare all'ultimo passaggio.",
         ],
         "cta": ("Completa l'ordine", "{{ event.extra.checkout_url }}"),
     },
@@ -146,8 +160,8 @@ EMAILS: list[dict] = [
         "heading": "Un motivo in piu per tornare",
         "body": [
             "{{ first_name|default:'' }}, ci proviamo una volta sola: "
-            "<b>-15% sul prossimo ordine</b>, codice <b>TORNA15</b>, valido 14 "
-            "giorni.",
+            "<b>-15% sul prossimo ordine</b>, codice <b>TORNA15</b>, un solo "
+            "utilizzo per cliente.",
             "Se non fa per te nessun problema — non insistiamo oltre e questa e "
             "l'ultima email di riattivazione che ricevi.",
         ],

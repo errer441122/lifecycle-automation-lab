@@ -33,9 +33,16 @@ costs nothing.
 export KLAVIYO_API_KEY=pk_xxx && python src/build_templates.py --live
 ```
 
+The key needs the **`templates:write`** scope. A key created for the profile
+sync has read access to templates and no write access, and the call fails with
+`403 permission_denied` naming the missing scope — Klaviyo scopes are per
+resource, so read on a resource implies nothing about write. Settings → API
+keys → the key → add the scope, or issue a new one.
+
 Then in Klaviyo, for each of the seven emails: Flows → the flow → the email →
 **Change template** → pick the matching one. The names line up (`1.1`, `1.2`,
-`2.1` …).
+`2.1` …). This part has no API: the Flows API exposes flow messages read-only,
+so template assignment is a manual step by design, not an oversight.
 
 ## 2. Become the first subscriber
 

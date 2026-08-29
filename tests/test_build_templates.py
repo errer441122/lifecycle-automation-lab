@@ -71,6 +71,37 @@ class TestRenderedHtml(unittest.TestCase):
                     self.assertIn("checkout_url", e["cta"][1])
 
 
+class TestClaimsMatchTheStore(unittest.TestCase):
+    """Copy can only promise what the storefront is configured to deliver.
+
+    This is the class of bug that survives every proofread: the sentence is
+    well written, the flow fires correctly, and the promise is simply not
+    true. It surfaces as a support ticket, or as a chargeback.
+    """
+
+    DURATION = re.compile(r"\b\d+\s*(?:ore|h|giorni|settimane|mesi)\b", re.I)
+
+    def test_no_duration_is_claimed_that_the_store_does_not_back(self):
+        allowed = {"%d giorni" % bt.STORE_FACTS["returns_days"]}
+        if bt.STORE_FACTS["shipping_sla"]:
+            allowed.add(bt.STORE_FACTS["shipping_sla"])
+        for e in bt.EMAILS:
+            for m in self.DURATION.finditer(bt.render_text(e)):
+                with self.subTest(e["key"], phrase=m.group(0)):
+                    self.assertIn(
+                        m.group(0).lower(),
+                        allowed,
+                        "copy states a duration the store does not publish",
+                    )
+
+    def test_winback_offer_matches_the_live_discount(self):
+        text = bt.render_text(next(e for e in bt.EMAILS if e["key"] == "3.2"))
+        self.assertIn(bt.STORE_FACTS["winback_code"], text)
+        self.assertIn("%d%%" % bt.STORE_FACTS["winback_percent"], text)
+        if bt.STORE_FACTS["winback_once_per_customer"]:
+            self.assertIn("un solo utilizzo per cliente", text)
+
+
 class TestPushSafety(unittest.TestCase):
     """A dry run must never reach the network."""
 

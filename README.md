@@ -26,6 +26,7 @@ here I *operate* on them. The bridge between the two is
 | List | *Newsletter (double opt-in)* — `WZDGDT`, double opt-in on, unsubscribe global |
 | Segment | *At risk (lifecycle_stage)* — `TFJaA4` |
 | Sign-up form | Flyout, Italian, consent required to submit |
+| Win-back offer | `TORNA15` — 15% off order, one use per customer, active |
 | Sender | *Torrefazione Nord* `<caffe@negozio-online.org>` |
 | Sending domain | `send.negozio-online.org` — NS delegation, DKIM, DMARC, **Active** |
 | Account | `it-IT`, `Europe/Rome` |

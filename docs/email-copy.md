@@ -91,17 +91,18 @@ gruppo di controllo, non regalato di default.
 motivo dell'abbandono — una distrazione, non un ripensamento — è ancora
 reversibile. È anche il ritardo che vale la pena testare per primo contro 1 ora.
 
-### 2.2 · 20 ore dopo · *Spedizione in 48h e reso gratuito entro 30 giorni*
+### 2.2 · 20 ore dopo · *Reso gratuito entro 30 giorni, e nessun account da creare*
 
 > Ti è rimasto un dubbio, {{ first_name|default:'' }}? I tre più comuni:
->
-> **Quanto ci mette?** 48 ore in tutta Italia. Tostiamo il lunedì e il giovedì,
-> quindi il caffè che ricevi ha meno di una settimana.
 >
 > **E se non mi piace?** Reso gratuito entro 30 giorni, spedizione di reso
 > a carico nostro. Il caffè è questione di gusti, non ha senso far finta di no.
 >
-> **Devo creare un account?** No, puoi ordinare come ospite.
+> **Devo creare un account?** No, puoi ordinare come ospite: bastano un
+> indirizzo email e uno di consegna.
+>
+> **Quanto costa la spedizione?** Te lo diciamo al check-out, prima del
+> pagamento. Nessun costo che compare all'ultimo passaggio.
 >
 > [Completa l'ordine →]
 
@@ -148,7 +149,7 @@ funziona senza sconto, il margine resta.
 ### 3.2 · 7 giorni dopo · *Un motivo in più per tornare*
 
 > {{ first_name|default:'' }}, ci proviamo una volta sola: **-15% sul prossimo
-> ordine**, codice `TORNA15`, valido 14 giorni.
+> ordine**, codice `TORNA15`, un solo utilizzo per cliente.
 >
 > Se non fa per te nessun problema — non insistiamo oltre e questa è l'ultima
 > email di riattivazione che ricevi.
@@ -171,20 +172,38 @@ a ciò che il negozio ha effettivamente configurato.
 | --- | --- |
 | Reso gratuito entro 30 giorni | Shopify → Informative → regola *Reso gratuito 30 giorni*: finestra 30 giorni dalla consegna, spedizione di reso gratuita, commissione di riassortimento 0% |
 | Nessun account richiesto | Checkout come ospite, impostazione predefinita del negozio |
+| `TORNA15`, −15%, un solo utilizzo per cliente | Shopify → Sconti → *TORNA15*, attivo, sconto ordine 15%, limite un utilizzo per cliente |
+| Nessun tempo di consegna promesso | Shopify → Spedizione: nessuna tariffa con stima di consegna pubblicata |
 
 La copy è stata riscritta per seguire la configurazione, non il contrario: la
 regola Shopify offriva 30 giorni e la prima stesura ne prometteva 14. Allineare
 la promessa al sistema che la deve mantenere è meno faticoso che ricordarsi di
 aggiornare due posti.
 
-**Restano dichiarazioni di brand, non verificabili da configurazione:** la
-spedizione in 48 ore e la tostatura del lunedì e del giovedì. Su un negozio
-reale vanno confermate con il corriere e con la produzione prima di qualunque
-invio.
+Due affermazioni della prima stesura sono state tolte perché il negozio non le
+regge, e vale la pena dire quali:
+
+**«Spedizione in 48 ore in tutta Italia».** Il negozio non pubblica nessuna
+tariffa di spedizione con una stima di consegna, quindi la promessa non era
+verificabile da nessuna parte se non dalla copy stessa. Sostituita da una frase
+vera per qualunque checkout Shopify: il costo lo vedi prima di pagare. È il
+tipo di errore che supera ogni rilettura — la frase è scritta bene, il flow
+parte, e la promessa semplicemente non è mantenibile. Si scopre dal servizio
+clienti.
+
+**«Valido 14 giorni».** Un flow di win-back gira in continuo: ogni profilo entra
+nel segmento in un giorno diverso, quindi un singolo codice statico non può
+avere una finestra di 14 giorni *per destinatario*. O si genera un codice per
+profilo, o si dichiarano le condizioni che il codice ha davvero — qui, un solo
+utilizzo per cliente. La seconda costa zero e resta vera.
+
+Un test in [`tests/test_build_templates.py`](../tests/test_build_templates.py)
+blocca la regressione: ogni durata che compare nella copy deve corrispondere a
+`STORE_FACTS`, altrimenti la suite fallisce.
 
 ## Prima di pubblicare
 
-- [ ] Sostituire `TORNA15` con un codice sconto vero creato in Shopify
+- [x] Creare `TORNA15` in Shopify — fatto, sconto ordine 15%, un utilizzo per cliente
+- [x] Togliere dalla copy le promesse che il negozio non pubblica
 - [ ] Verificare che i merge tag rendano su un invio di prova, non in anteprima
 - [ ] Controllare i blocchi prodotto dinamici del carrello con un ordine reale
-- [ ] Confermare spedizione 48h e calendario di tostatura
