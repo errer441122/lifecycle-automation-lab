@@ -31,7 +31,7 @@ here I *operate* on them. The bridge between the two is
 | Sending domain | `send.negozio-online.org` — NS delegation, DKIM, DMARC, **Active** |
 | Account | `it-IT`, `Europe/Rome` |
 | Flow 1 Welcome | **Live** — 1.1 (Day 0) → wait 3 days → 1.2 (Day 3) |
-| Flow 2 Abandoned cart | exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 |
+| Flow 2 Abandoned cart | **Live** — exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 |
 | Flow 3 Win-back | 3.1 (Day 0) → wait 7 days → 3.2 (Day 7) |
 | Every email | Content live, Smart Sending and UTM tracking on, sender *Torrefazione Nord* |
 
@@ -50,7 +50,7 @@ here I *operate* on them. The bridge between the two is
 | # | Flow | Trigger | What it demonstrates |
 | --- | --- | --- | --- |
 | 1 | Welcome | Added to the double opt-in list, i.e. after confirmation | Consent enforced one layer below the flow, so it cannot be bypassed by editing the flow |
-| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought |
+| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought. **Built and live; not exercised by a live purchase** — see [results](reports/results.md) |
 | 3 | Win-back | Entry into the `At risk` segment | An analysis model, not a platform event, deciding who gets an email |
 
 Full specification in [`docs/flows.md`](docs/flows.md).
@@ -153,7 +153,8 @@ by hand, once, through the flow's code editor. What *is* automatable is the
 check — `--verify` reads each live template back and exits non-zero if it has
 drifted from this repo, which is the failure that actually happens: copy
 edited here, never re-pasted there. `--verify` needs read scope only; it never
-writes.
+writes. So the loop after any copy change is: edit `EMAILS`, run with `--out`,
+paste the changed file into the flow message's code editor, run `--verify`.
 
 ## Deliverability
 

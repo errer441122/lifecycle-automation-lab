@@ -13,6 +13,10 @@ default in most clients on first open, and this project has no brand imagery to
 show anyway. An email that says everything it needs to in text survives all of
 that.
 
+The preheader is a hidden div at the top of each template, which is the
+portable way every client reads it. Klaviyo's own "Preview text" field is left
+empty on purpose: filling both renders the preheader twice.
+
 `{% unsubscribe %}` is mandatory. A custom HTML template does not inherit
 Klaviyo's footer, so without that tag the send would breach both the consent
 design in docs/consent.md and the one-click unsubscribe requirement in
@@ -340,7 +344,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {e['key']}  {'matches' if not problem else 'DRIFT: ' + problem}")
     if drift:
         print(f"\n{drift} email(s) do not match this repo. Paste the rendered "
-              "HTML into the flow message - see docs/first-cycle.md.")
+              "HTML into the flow message - see the README.")
         return 1
     print("\nEvery flow email matches the copy in this repo.")
     return 0

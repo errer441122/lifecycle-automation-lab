@@ -79,7 +79,7 @@ which is the only path that can grant consent.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Welcome — 1.1 | 1 | 1 | — | — | 0 | 0 | 0 |
 | Welcome — 1.2 | pending (Day 3) | | | | | | |
-| Abandoned cart | not activated yet | | | | | | |
+| Abandoned cart — 2.1/2.2/2.3 | 0 | 0 | | | | | |
 | Win-back | cannot run before December | | | | | | |
 
 One delivery. That is a mechanism working, not a measurement — see the section
@@ -96,6 +96,16 @@ above.
 between landing on the consent page and confirming. That gap is the double
 opt-in doing its job: the profile existed and had marketing consent from
 15:41, and still received nothing until it confirmed for *this* list.
+
+**The abandoned-cart flow is live and has not been exercised, deliberately.**
+Triggering it means driving a storefront — adding to cart, starting checkout,
+abandoning, then completing a second one inside four hours. That is front-end
+work, and this project is about the automation. The flow, its trigger filter
+and its three delays are inspectable in the screenshots and in
+[`../docs/flows.md`](../docs/flows.md); what is *not* claimed anywhere is that
+the exit condition has been observed suppressing a send. Reviewing the design
+is fair. Reading it as a verified result is not, and the distinction is the
+reason this paragraph exists.
 
 The win-back cannot produce data until roughly December: it triggers on entry
 to `At risk`, which needs 91+ days since the last order, and the seeded orders
