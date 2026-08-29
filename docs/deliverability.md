@@ -24,6 +24,14 @@ to *do*, and it is the one people skip.
 
 ### Values
 
+> **Status: Active in Klaviyo.** Two manual steps got it there that the
+> dashboard never prompts for. Klaviyo had not started its verification job at
+> all — the row read *"created but has not started verification yet"* for a day
+> while the DNS was already correct — and once Verified the domain still had to
+> be **activated** separately before any send would use it. A domain can sit
+> Verified indefinitely while every email goes out on Klaviyo's shared domain,
+> and nothing in the send report says so.
+
 Sending domain: **`send.negozio-online.org`**. The registrar is Cloudflare and
 the zone is on Cloudflare DNS, so the records below live in the Cloudflare DNS
 panel. Routing is **dynamic**, which delegates the whole `send.` subdomain to

@@ -14,22 +14,11 @@ Do these in order. Activating a flow before its emails have content sends
 
 ---
 
-## 0. Check the sending domain first
+## 0. Sending domain — done
 
-Klaviyo's dashboard showed `send.negozio-online.org` as *Incomplete* even after
-DNS was correct, because its verification job runs on its own schedule. If the
-domain is still not verified at send time, Klaviyo silently falls back to its
-shared sending domain and the whole DKIM/DMARC setup contributes nothing to
-that send.
-
-Settings → Domains. If it does not read verified, the DNS is still right —
-confirm it independently rather than waiting on the dashboard:
-
-```bash
-nslookup -type=NS send.negozio-online.org
-nslookup -type=CNAME s1._domainkey.send.negozio-online.org
-nslookup -type=TXT _dmarc.negozio-online.org
-```
+`send.negozio-online.org` is **Active**. Verified, then activated: two separate
+steps, and a domain left merely Verified sends on Klaviyo's shared domain
+without saying so anywhere in the report.
 
 ## 1. Generate and assign the templates
 

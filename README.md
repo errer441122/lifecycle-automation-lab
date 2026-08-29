@@ -27,7 +27,7 @@ here I *operate* on them. The bridge between the two is
 | Segment | *At risk (lifecycle_stage)* — `TFJaA4` |
 | Sign-up form | Flyout, Italian, consent required to submit |
 | Sender | *Torrefazione Nord* `<caffe@negozio-online.org>` |
-| Sending domain | `send.negozio-online.org` — NS delegation, DKIM, DMARC |
+| Sending domain | `send.negozio-online.org` — NS delegation, DKIM, DMARC, **Active** |
 | Account | `it-IT`, `Europe/Rome` |
 | Flow 1 Welcome | 1.1 (Day 0) → wait 3 days → 1.2 (Day 3) |
 | Flow 2 Abandoned cart | exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 |
