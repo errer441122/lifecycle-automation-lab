@@ -17,25 +17,21 @@ here I *operate* on them. The bridge between the two is
 > full cycle. See
 > [Boundaries](#boundaries) for exactly what is real here and what is not.
 
-## Build status
+## What is set up
 
-| Piece | State |
+| | |
 | --- | --- |
-| Shopify store, 8 products, 3 seeded orders | done |
-| Klaviyo ↔ Shopify integration, onsite embed active | done |
-| List *Newsletter (double opt-in)* (`WZDGDT`), double opt-in on, global unsubscribe | done |
-| Sending domain `send.negozio-online.org` — NS delegation, DKIM, DMARC | done, verified via `nslookup` |
-| Sender identity — *Torrefazione Nord* `<caffe@negozio-online.org>`, applied to every flow email | done |
-| Account language `it-IT`, timezone `Europe/Rome` | done |
-| Segment *At risk (lifecycle_stage)* (`TFJaA4`) | done — 0 members, which is correct: nobody is at risk yet |
-| Flow 1 Welcome — Email 1.1 (Day 0) → Wait 3 days → Email 1.2 (Day 3) | done, Draft |
-| Flow 2 Abandoned cart — exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 | done, Draft |
-| Flow 3 Win-back — 3.1 (Day 0) → Wait 7 days → 3.2 (Day 7) | done, Draft |
-| Smart Sending + UTM tracking on all seven emails | done |
-| Copy for all seven emails | done — [`docs/email-copy.md`](docs/email-copy.md) |
-| Sign-up form, live — Italian, flyout, consent required to submit | done |
-| Shopify return rule, matching what the copy promises | done — 30 days, free return shipping, 0% restocking |
-| Email templates | generated as HTML by [`src/build_templates.py`](src/build_templates.py) — run it, then assign each one in the flow |
+| Store | Shopify, 8 products, 3 seeded orders, integrated with Klaviyo |
+| List | *Newsletter (double opt-in)* — `WZDGDT`, double opt-in on, unsubscribe global |
+| Segment | *At risk (lifecycle_stage)* — `TFJaA4` |
+| Sign-up form | Flyout, Italian, consent required to submit |
+| Sender | *Torrefazione Nord* `<caffe@negozio-online.org>` |
+| Sending domain | `send.negozio-online.org` — NS delegation, DKIM, DMARC |
+| Account | `it-IT`, `Europe/Rome` |
+| Flow 1 Welcome | 1.1 (Day 0) → wait 3 days → 1.2 (Day 3) |
+| Flow 2 Abandoned cart | exit filter → 4h → 2.1 → 20h → 2.2 → 2 days → 2.3 |
+| Flow 3 Win-back | 3.1 (Day 0) → wait 7 days → 3.2 (Day 7) |
+| Every email | Smart Sending and UTM tracking on |
 
 ## Recruiter 5-minute route
 
@@ -49,11 +45,11 @@ here I *operate* on them. The bridge between the two is
 
 ## The flows
 
-| # | Flow | Trigger | Steps | What it demonstrates |
-| --- | --- | --- | --- | --- |
-| 1 | Welcome | Signup form submission, confirmed | 3 | Double opt-in, consent source captured, suppression respected |
-| 2 | Abandoned cart | `Checkout Started` without `Placed Order` | 3 | Event-driven timing, conditional split, exit on purchase |
-| 3 | Win-back | Entry into the `At risk` lifecycle segment | 2 | Analysis output driving an actual send |
+| # | Flow | Trigger | What it demonstrates |
+| --- | --- | --- | --- |
+| 1 | Welcome | Added to the double opt-in list, i.e. after confirmation | Consent enforced one layer below the flow, so it cannot be bypassed by editing the flow |
+| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought |
+| 3 | Win-back | Entry into the `At risk` segment | An analysis model, not a platform event, deciding who gets an email |
 
 Full specification in [`docs/flows.md`](docs/flows.md).
 
