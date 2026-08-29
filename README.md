@@ -11,9 +11,10 @@ here I *operate* on them. The bridge between the two is
 
 > **Status (2026-08-29).** Store, ESP, sending-domain authentication, sender
 > identity, consent settings, the lifecycle segment and all three flows —
-> triggers, filters, delays, seven emails, tracking — are built. Every flow is
-> **Draft**: nothing sends. Copy is written; the visual templates are not
-> assembled. The results section fills in after the first full cycle. See
+> triggers, filters, delays, seven emails, tracking — are built, and the email
+> templates are generated from code. Every flow is **Draft**: nothing sends,
+> and the list has no subscribers. The results section fills in after the first
+> full cycle. See
 > [Boundaries](#boundaries) for exactly what is real here and what is not.
 
 ## Build status
@@ -34,7 +35,7 @@ here I *operate* on them. The bridge between the two is
 | Copy for all seven emails | done — [`docs/email-copy.md`](docs/email-copy.md) |
 | Sign-up form, live — Italian, flyout, consent required to submit | done |
 | Shopify return rule, matching what the copy promises | done — 30 days, free return shipping, 0% restocking |
-| Visual templates assembled in the editor | **not done** — copy is written, layout is not |
+| Email templates | generated as HTML by [`src/build_templates.py`](src/build_templates.py) — run it, then assign each one in the flow |
 
 ## Recruiter 5-minute route
 
@@ -57,9 +58,6 @@ here I *operate* on them. The bridge between the two is
 Full specification in [`docs/flows.md`](docs/flows.md).
 
 ## Screenshots
-
-<!-- Capture each screen, save it under the given filename, then replace the
-     row with an image embed and delete this comment. -->
 
 Every screen below exists now. Capture each one, save it under the given
 filename, then replace the row with an image embed.
@@ -116,6 +114,7 @@ python -m unittest discover -s tests
 python src/sync_klaviyo.py --as-of 2026-06-01
 ```
 
+
 That is a **dry run**: it prints the suppression report and writes
 `reports/sync_report.json` without opening a socket. On the bundled example
 data it resolves 7 customers into 5 eligible profiles across all five stages,
@@ -127,6 +126,24 @@ private key on the command line lands in shell history) and pass `--live`:
 ```bash
 export KLAVIYO_API_KEY=pk_xxx && python src/sync_klaviyo.py --orders data/orders.csv --consent data/consent.csv --list-id ABC123 --live
 ```
+
+Building the seven email templates is the same shape — dry run first, and the
+key is read from the environment either way:
+
+```bash
+python src/build_templates.py --out build/
+```
+
+```bash
+export KLAVIYO_API_KEY=pk_xxx && python src/build_templates.py --live
+```
+
+Klaviyo's drag-and-drop editor has no HTML view, so assembling seven emails by
+hand is about nine block operations each. Generating them from one render
+function instead means the layout is written once, the copy is reviewable in a
+diff, and a test can assert the things that only fail after a real send — a
+missing `{% unsubscribe %}`, a `{{ first_name }}` with no default, a cart email
+whose button does not point at the checkout URL.
 
 ## Deliverability
 

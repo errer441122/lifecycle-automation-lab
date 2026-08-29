@@ -6,3 +6,4 @@ reports/sync_report.json
 __pycache__/
 *.pyc
 .venv/
+build/
