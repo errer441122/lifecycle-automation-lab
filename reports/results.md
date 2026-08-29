@@ -79,7 +79,8 @@ which is the only path that can grant consent.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Welcome — 1.1 | 1 | 1 | — | — | 0 | 0 | 0 |
 | Welcome — 1.2 | pending (Day 3) | | | | | | |
-| Abandoned cart — 2.1/2.2/2.3 | 0 | 0 | | | | | |
+| Abandoned cart — 2.1 | 1 | due 20:45 UTC | | | | | |
+| Abandoned cart — 2.2/2.3 | pending (+20h, +2d) | | | | | | |
 | Win-back | cannot run before December | | | | | | |
 
 One delivery. That is a mechanism working, not a measurement — see the section
@@ -97,15 +98,24 @@ between landing on the consent page and confirming. That gap is the double
 opt-in doing its job: the profile existed and had marketing consent from
 15:41, and still received nothing until it confirmed for *this* list.
 
-**The abandoned-cart flow is live and has not been exercised, deliberately.**
-Triggering it means driving a storefront — adding to cart, starting checkout,
-abandoning, then completing a second one inside four hours. That is front-end
-work, and this project is about the automation. The flow, its trigger filter
-and its three delays are inspectable in the screenshots and in
-[`../docs/flows.md`](../docs/flows.md); what is *not* claimed anywhere is that
-the exit condition has been observed suppressing a send. Reviewing the design
-is fair. Reading it as a verified result is not, and the distinction is the
-reason this paragraph exists.
+**The abandoned-cart flow was entered by a real cart.**
+
+```
+16:45:52  Checkout Started   Colombia Huila 250g, $11.00, Source Name: web
+          $extra.checkout_url -> .../checkouts/ac/hWNGDmdA.../recover?key=...
+```
+
+`Source Name: web` is the part that matters: the event came from Shopify's
+checkout webhook on the storefront, not from anything constructed in the
+admin. Delivery of 2.1 is due at 20:45 UTC, four hours later, and is recorded
+above as due rather than as delivered.
+
+**The exit condition has still not been observed suppressing a send**, and one
+cart cannot show both. The condition is re-evaluated before every send, so any
+`Placed Order` in those four hours removes the profile and 2.1 never goes out
+— which would demonstrate suppression at the cost of demonstrating the send.
+This run demonstrates the send. Reviewing the exit condition's design is fair;
+reading it as verified behaviour is not.
 
 The win-back cannot produce data until roughly December: it triggers on entry
 to `At risk`, which needs 91+ days since the last order, and the seeded orders
@@ -254,6 +264,33 @@ is incoherent with the mechanism sending it.
 storefront actually backs, and a test fails if any duration in the copy is not
 in it. `TORNA15` was created in Shopify so the offer is real, and the copy now
 states the terms the discount has.
+
+### An abandoned cart cannot be manufactured from the Shopify admin
+
+The obvious way to trigger the cart flow without touching a storefront is a
+draft order in the admin, and it looked supported: earlier `Checkout Started`
+events in this account carried `Source Name: shopify_draft_order`.
+
+A draft order was created and left unpaid. **No event, five minutes later.**
+Going back to those earlier events explains why — `Checkout Started` at
+13:56:18 and `Placed Order` at 13:56:37, nineteen seconds apart. The draft
+order emits `Checkout Started` when it is *completed*, and completing it also
+emits `Placed Order`. So the admin can produce a purchase, and it can produce
+a checkout, but it cannot produce a checkout that was abandoned: the two
+events are welded together.
+
+**What changed as a result:** the cart flow was entered from the storefront
+instead, which is the only path that produces the event this flow is designed
+around. Worth knowing before building a QA routine on draft orders.
+
+### The cart CTA was checked before the send, not after
+
+`{{ event.extra.checkout_url }}` is the button in all three cart emails, and a
+Klaviyo event stores that payload under `$extra`, not `extra`. Reading the
+live event back confirmed the key exists and holds a real Shopify recovery URL
+before the four-hour delay elapsed. A dead CTA in the one cart email this
+project actually sends would have been discovered by clicking it — which is
+the expensive way.
 
 ### Smaller ones, without the write-up
 

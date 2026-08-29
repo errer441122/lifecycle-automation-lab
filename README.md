@@ -9,14 +9,15 @@ This is the companion to that analysis: there I *measure* lifecycle and RFM,
 here I *operate* on them. The bridge between the two is
 [`src/sync_klaviyo.py`](src/sync_klaviyo.py).
 
-> **Status (2026-08-29).** The welcome path has run end to end: consent given
-> on the form, confirmed by clicking the link, flow triggered, email delivered
-> — 47 seconds from confirmation to inbox. One subscriber, which is a working
-> mechanism and not a measurement. The abandoned-cart flow is next; the
+> **Status (2026-08-29).** Two of the three flows have been entered by real
+> events. Welcome: consent given on the form, confirmed by clicking the link,
+> email delivered 47 seconds later. Abandoned cart: a real storefront checkout
+> at 16:45 UTC, `Source Name: web`, first email due four hours after. One
+> subscriber and one cart — a working mechanism, not a measurement. The
 > win-back cannot produce data before December and that is stated rather than
-> worked around. Numbers and the five things that broke on the way are in
-> [`reports/results.md`](reports/results.md); see
-> [Boundaries](#boundaries) for what is real here and what is not.
+> worked around. Numbers, and the six things that broke on the way, are in
+> [`reports/results.md`](reports/results.md); see [Boundaries](#boundaries) for
+> what is real here and what is not.
 
 ## What is set up
 
@@ -50,7 +51,7 @@ here I *operate* on them. The bridge between the two is
 | # | Flow | Trigger | What it demonstrates |
 | --- | --- | --- | --- |
 | 1 | Welcome | Added to the double opt-in list, i.e. after confirmation | Consent enforced one layer below the flow, so it cannot be bypassed by editing the flow |
-| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought. **Built and live; not exercised by a live purchase** — see [results](reports/results.md) |
+| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought. **Live, entered by a real storefront cart**; the exit condition itself is not yet observed suppressing a send — see [results](reports/results.md) |
 | 3 | Win-back | Entry into the `At risk` segment | An analysis model, not a platform event, deciding who gets an email |
 
 Full specification in [`docs/flows.md`](docs/flows.md).
