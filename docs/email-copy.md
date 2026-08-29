@@ -91,17 +91,17 @@ gruppo di controllo, non regalato di default.
 motivo dell'abbandono — una distrazione, non un ripensamento — è ancora
 reversibile. È anche il ritardo che vale la pena testare per primo contro 1 ora.
 
-### 2.2 · 20 ore dopo · *Spedizione in 48h e reso gratuito entro 14 giorni*
+### 2.2 · 20 ore dopo · *Spedizione in 48h e reso gratuito entro 30 giorni*
 
 > Ti è rimasto un dubbio, {{ first_name|default:'' }}? I tre più comuni:
 >
 > **Quanto ci mette?** 48 ore in tutta Italia. Tostiamo il lunedì e il giovedì,
 > quindi il caffè che ricevi ha meno di una settimana.
 >
-> **E se non mi piace?** Reso gratuito entro 14 giorni, anche a sacchetto
-> aperto. Il caffè è questione di gusti, non ha senso far finta di no.
+> **E se non mi piace?** Reso gratuito entro 30 giorni, spedizione di reso
+> a carico nostro. Il caffè è questione di gusti, non ha senso far finta di no.
 >
-> **Come pago?** Carta, PayPal, Apple Pay. Nessun account da creare.
+> **Devo creare un account?** No, puoi ordinare come ospite.
 >
 > [Completa l'ordine →]
 
@@ -162,12 +162,29 @@ questa passa alla traccia a bassa frequenza descritta in
 
 ---
 
+## Allineamento con le policy del negozio
+
+Le affermazioni fattuali nella copy non sono inventate a piacere: corrispondono
+a ciò che il negozio ha effettivamente configurato.
+
+| Affermazione | Dove è configurata |
+| --- | --- |
+| Reso gratuito entro 30 giorni | Shopify → Informative → regola *Reso gratuito 30 giorni*: finestra 30 giorni dalla consegna, spedizione di reso gratuita, commissione di riassortimento 0% |
+| Nessun account richiesto | Checkout come ospite, impostazione predefinita del negozio |
+
+La copy è stata riscritta per seguire la configurazione, non il contrario: la
+regola Shopify offriva 30 giorni e la prima stesura ne prometteva 14. Allineare
+la promessa al sistema che la deve mantenere è meno faticoso che ricordarsi di
+aggiornare due posti.
+
+**Restano dichiarazioni di brand, non verificabili da configurazione:** la
+spedizione in 48 ore e la tostatura del lunedì e del giovedì. Su un negozio
+reale vanno confermate con il corriere e con la produzione prima di qualunque
+invio.
+
 ## Prima di pubblicare
 
 - [ ] Sostituire `TORNA15` con un codice sconto vero creato in Shopify
 - [ ] Verificare che i merge tag rendano su un invio di prova, non in anteprima
 - [ ] Controllare i blocchi prodotto dinamici del carrello con un ordine reale
-- [ ] Le affermazioni concrete — 48h di spedizione, reso a 14 giorni, tostatura
-      lunedì e giovedì — sono **placeholder plausibili, non impegni verificati**.
-      Vanno allineate alla realtà del negozio prima di qualunque invio, o
-      diventano pubblicità ingannevole.
+- [ ] Confermare spedizione 48h e calendario di tostatura
