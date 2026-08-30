@@ -77,11 +77,15 @@ which is the only path that can grant consent.
 
 | Flow | Entered | Delivered | Opened | Clicked | Orders | Unsub | Complaints |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Welcome — 1.1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| Welcome — 1.1 | 1 | 1 | 2 | 0 | 0 | 0 | 0 |
 | Welcome — 1.2 | pending (Day 3) | | | | | | |
-| Abandoned cart — 2.1 | 1 | **0 — skipped** | | | | | |
-| Abandoned cart — 2.2 | waiting | due 16:45 UTC, 30 Aug | | | | | |
-| Abandoned cart — 2.3 | pending (+2d) | | | | | | |
+| Abandoned cart — 2.1 | 1 | **0 — skipped, Smart Sending** | | | | | |
+| Abandoned cart — 2.2 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| Abandoned cart — 2.3 | pending (1 Sep) | | | | | | |
+
+Two deliveries, two opens, zero clicks, zero unsubscribes, zero complaints.
+Opens are counted here because they were pixel-fired on a real client; at n=2
+they say nothing about performance and are not offered as if they did.
 | Win-back | cannot run before December | | | | | | |
 
 One delivery. That is a mechanism working, not a measurement — see the section
@@ -110,10 +114,19 @@ opt-in doing its job: the profile existed and had marketing consent from
 checkout webhook on the storefront, not from anything constructed in the
 admin.
 
-**2.1 was never sent.** The profile entered the flow, waited the four hours,
-and the send was skipped — see *Smart Sending ate the cart email* below. 2.2
-is queued behind the 20-hour delay and due at 16:45 UTC on 30 August, by which
-point the window that suppressed 2.1 has passed.
+**2.1 was never sent; 2.2 was.** The profile entered the flow, waited the four
+hours, and the first send was skipped — see *Smart Sending ate the cart email*
+below. It stayed in the flow, waited the next twenty, and the second email
+went out:
+
+```
+30 Aug 16:47:58  Received Email  "Ti e rimasto un dubbio?"   flow RptvzW
+30 Aug 16:49:44  Opened Email    "Ti e rimasto un dubbio?"
+```
+
+24h02m06s after `Checkout Started`, against a designed 4h + 20h. Two minutes
+of queue latency across a day-long chain, and the profile opened it inside two
+minutes of delivery.
 
 **The exit condition has still not been observed suppressing a send**, and one
 cart cannot show both. The condition is re-evaluated before every send, so any
@@ -284,9 +297,22 @@ to find.
 
 Four hours and fifty-nine minutes separated the welcome email from the cart
 email. Klaviyo's Smart Sending suppresses a send to anyone who has already
-received an email inside a rolling window — 16 hours by default — so the cart
-email was dropped. Smart Sending is on by default and was left on, deliberately,
-on all seven messages.
+received an email inside a rolling window, and the cart email was dropped.
+Smart Sending is on by default and was left on, deliberately, on all seven
+messages.
+
+**The next email in the same flow proves the mechanism rather than asserting
+it.** Same profile, same flow, same Smart Sending setting — only the elapsed
+time changed:
+
+| Send | Time since the previous email | Outcome |
+| --- | --- | --- |
+| 2.1 | 4h 58m 34s | skipped |
+| 2.2 | 25h 00m 40s | delivered |
+
+That brackets the window between roughly 5 and 25 hours, which is consistent
+with the 16-hour default and — more to the point — was measured here rather
+than read off a help page.
 
 **This is not a bug. It is the feature working, and costing a conversion.** On
 a large list the two flows rarely collide, because a subscriber who joined

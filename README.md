@@ -12,15 +12,16 @@ here I *operate* on them. The bridge between the two is
 > **Status (2026-08-30).** Two of the three flows have been entered by real
 > events. Welcome: consent given on the form, confirmed by clicking the link,
 > email delivered 47 seconds later, opened 90 minutes after that. Abandoned
-> cart: a real storefront checkout, `Source Name: web` — and the first cart
-> email **was skipped by Smart Sending**, because the welcome had gone out five
-> hours earlier and that is inside the window. Not a bug; the feature working,
-> and costing a conversion. It is the most useful thing in
-> [`reports/results.md`](reports/results.md), along with the six other things
-> that broke. One subscriber and one cart — a working mechanism, not a
-> measurement. The win-back cannot produce data before December and that is
-> stated rather than worked around. See [Boundaries](#boundaries) for what is
-> real here and what is not.
+> cart: a real storefront checkout, `Source Name: web`, and two emails due —
+> the first **skipped by Smart Sending** because the welcome had gone out five
+> hours earlier, the second **delivered and opened** a day later, once the
+> window had passed. Same profile, same flow, same setting; only the elapsed
+> time changed, which is what makes it evidence rather than a guess. It is the
+> most useful thing in [`reports/results.md`](reports/results.md), along with
+> the six other things that broke. One subscriber, one cart, two deliveries —
+> a working mechanism, not a measurement. The win-back cannot produce data
+> before December and that is stated rather than worked around. See
+> [Boundaries](#boundaries) for what is real here and what is not.
 
 ## What is set up
 
@@ -55,7 +56,7 @@ here I *operate* on them. The bridge between the two is
 | # | Flow | Trigger | What it demonstrates |
 | --- | --- | --- | --- |
 | 1 | Welcome | Added to the double opt-in list, i.e. after confirmation | Consent enforced one layer below the flow, so it cannot be bypassed by editing the flow |
-| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought. **Live, entered by a real storefront cart**; the exit condition itself is not yet observed suppressing a send — see [results](reports/results.md) |
+| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought. **Live, entered by a real storefront cart, one email delivered and opened.** The exit condition itself has still not been observed suppressing a send — see [results](reports/results.md) |
 | 3 | Win-back | Entry into the `At risk` segment | An analysis model, not a platform event, deciding who gets an email |
 
 Full specification in [`docs/flows.md`](docs/flows.md).
