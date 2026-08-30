@@ -61,17 +61,30 @@ From `reports/sync_report.json`:
 
 | | Count |
 | --- | --- |
-| Customers in orders export | 2 |
-| Eligible after consent gate | **0** |
+| Customers in orders export | 3 |
+| Eligible after consent gate | 1 |
 | Suppressed — `opted_out` | 0 |
 | Suppressed — `unknown` | 2 |
-| `New` / `Repeat` / `At risk` / `Dormant` / `Churned` | 0 / 0 / 0 / 0 / 0 |
 
-Zero eligible is the expected result, not a failure. Both customers were
-created in the Shopify admin with the marketing checkbox left unticked, so the
-gate suppresses them and the script exits without opening a socket. The one
-profile that *is* on the list did not come from here — it came from the form,
-which is the only path that can grant consent.
+The two suppressed customers were created in the Shopify admin with the
+marketing checkbox left unticked, so the gate holds them back and they never
+reach the ESP — which is the whole point of the gate, and the cheapest proof
+that it works. The one eligible customer is the subscriber: consent from the
+double opt-in form on 29 August, and a real order (#1004) on 30 August.
+
+**The reference date is the only thing that changes the answer.** Same three
+customers, same consent file, same unmodified rules:
+
+| `--as-of` | Stage assigned |
+| --- | --- |
+| today (30 Aug 2026) | `New` — 1 order, 0 days ago |
+| `2026-12-15` | `At risk` — 107 days ago, inside the 91–180 band |
+
+`At risk` requires 91+ days since the last order, so the win-back flow could
+not otherwise be exercised before December. Pinning the reference date is the
+same device any cohort analysis uses, and it is disclosed here rather than
+quietly baked in: nothing about the order was altered, only the date the
+recency is measured from.
 
 ## Flow activity
 
@@ -81,7 +94,8 @@ which is the only path that can grant consent.
 | Welcome — 1.2 | pending (Day 3) | | | | | | |
 | Abandoned cart — 2.1 | 1 | **0 — skipped, Smart Sending** | | | | | |
 | Abandoned cart — 2.2 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| Abandoned cart — 2.3 | pending (1 Sep) | | | | | | |
+| Abandoned cart — 2.3 | pending (1 Sep) — expected to be filtered, see below | | | | | | |
+| Win-back — 3.1 | not yet triggered | | | | | | |
 
 Two deliveries, two opens, zero clicks, zero unsubscribes, zero complaints.
 Opens are counted here because they were pixel-fired on a real client; at n=2
@@ -348,6 +362,16 @@ order emits `Checkout Started` when it is *completed*, and completing it also
 emits `Placed Order`. So the admin can produce a purchase, and it can produce
 a checkout, but it cannot produce a checkout that was abandoned: the two
 events are welded together.
+
+**Confirmed first-hand later.** Draft order #D4 was eventually completed to
+produce a real `Placed Order`, and the pair arrived exactly as predicted:
+
+```
+30 Aug 19:49:24  Checkout Started   Etiopia Yirgacheffe 250g, $12.50
+30 Aug 19:49:43  Placed Order       Etiopia Yirgacheffe 250g, $12.50
+```
+
+Nineteen seconds. The inference from the 28 August events was right.
 
 **What changed as a result:** the cart flow was entered from the storefront
 instead, which is the only path that produces the event this flow is designed
