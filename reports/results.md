@@ -349,6 +349,44 @@ cart touch and gets 2.2 instead. This project leaves it on and reports the
 skip, because a portfolio that silences an inconvenient safeguard is worth
 less than one that explains it.
 
+### The exit-condition test was confounded, and that is the finding
+
+Completing draft #D4 into order #1004 was supposed to settle the last open
+claim: the cart flow's filter is `Placed Order = 0 since flow start`,
+re-evaluated before every send, so an order should stop the next email.
+
+```
+30 Aug 19:49:24  Checkout Started   (re-entry into the cart flow)
+30 Aug 19:49:43  Placed Order       #1004, $12.50
+30 Aug 23:49     2.1 due            nothing sent
+```
+
+Nothing was sent, which is the right outcome. **It does not prove the exit
+condition, because a second mechanism could have produced the same silence.**
+The previous email, 2.2, had been delivered at 16:47 — seven hours and one
+minute earlier, inside the Smart Sending window measured above. Either
+mechanism alone would have blocked the send. One observation, two sufficient
+causes, no way to tell them apart.
+
+Klaviyo's own screens do not settle it either. The flow canvas reports
+**Skipped 2** for 2.1 over the last 30 days; the same message's *Recipient
+activity*, set to **All time**, reports **Skipped (1)** and returns no rows in
+the drill-down that names the reason. An all-time count cannot be smaller than
+a 30-day count, so one of the two is wrong or lagging, and the screen that
+would have named the cause is the one that failed to load.
+
+**The experiment that would settle it,** written down because naming it is
+worth more than a confident wrong answer: start a cart when the last email to
+that profile is more than 25 hours old, then place an order inside the
+four-hour delay. With Smart Sending out of range, a non-send has exactly one
+possible cause. It was not run here because every send resets that clock and
+the win-back was already queued.
+
+**What changed as a result:** nothing in the repo claims the exit condition
+has been observed. It is built, it is inspectable, and the one test run
+against it could not distinguish it from a neighbouring safeguard. That is a
+smaller claim than "verified" and it is the one the evidence supports.
+
 ### An abandoned cart cannot be manufactured from the Shopify admin
 
 The obvious way to trigger the cart flow without touching a storefront is a

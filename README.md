@@ -56,7 +56,7 @@ here I *operate* on them. The bridge between the two is
 | # | Flow | Trigger | What it demonstrates |
 | --- | --- | --- | --- |
 | 1 | Welcome | Added to the double opt-in list, i.e. after confirmation | Consent enforced one layer below the flow, so it cannot be bypassed by editing the flow |
-| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought. **Live, entered by a real storefront cart, one email delivered and opened.** The exit condition itself has still not been observed suppressing a send — see [results](reports/results.md) |
+| 2 | Abandoned cart | `Checkout Started` | An exit condition re-evaluated before *every* send, not only at entry — the difference between a working cart flow and one that keeps emailing people who already bought. **Live, entered by a real storefront cart, one email delivered and opened.** The exit condition has *not* been observed suppressing a send: the one test run against it was confounded by Smart Sending, and [results](reports/results.md) names the experiment that would settle it |
 | 3 | Win-back | Entry into the `At risk` segment | An analysis model, not a platform event, deciding who gets an email |
 
 Full specification in [`docs/flows.md`](docs/flows.md).
