@@ -89,13 +89,14 @@ recency is measured from.
 **It ran, and the whole chain held.** 31 August:
 
 ```
-12:55  sync --as-of 2026-12-15 --live  ->  lifecycle_stage = "At risk"
-13:07  segment "At risk (lifecycle_stage)"  ->  1 profile
-13:15  3.1 "E passato un po. Il tuo caffe ti aspetta"  opened   flow WiNBzn
+12:55:00  sync --as-of 2026-12-15 --live  ->  lifecycle_stage = "At risk"
+13:07:37  segment "At risk (lifecycle_stage)"  ->  1 profile
+13:11:49  3.1 "E passato un po. Il tuo caffe ti aspetta"  delivered  flow WiNBzn
+13:15:27  3.1 opened
 ```
 
 Roughly twelve minutes from a property written by a Python script to a segment
-membership, and eight more to an email opened. This is the bridge the whole
+membership, four more to a delivery, and four more to an open. This is the bridge the whole
 repo is built around: the lifecycle model lives in code, not in the ESP, and
 the ESP reads its output as an ordinary profile property.
 
