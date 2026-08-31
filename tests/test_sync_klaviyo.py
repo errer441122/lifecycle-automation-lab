@@ -67,6 +67,17 @@ class TestConsentGate(unittest.TestCase):
         self.assertEqual(self.report["suppressed_by_reason"]["opted_out"], 1)
         self.assertEqual(self.report["suppressed"], 2)
 
+    def test_a_pinned_reference_date_is_visible_on_the_profile(self):
+        # A pinned --as-of is a disclosure, and a disclosure that only lives in
+        # the write-up is not one. Writing it into lifecycle_computed_at instead
+        # would tell anyone reading the profile in the ESP that the model ran on
+        # a date it did not run on.
+        props = self.profiles[0]["attributes"]["properties"]
+        self.assertEqual(props["lifecycle_as_of"], self.AS_OF.isoformat())
+        self.assertEqual(
+            props["lifecycle_computed_at"], date.today().isoformat()
+        )
+
     def test_high_value_does_not_buy_its_way_past_the_gate(self):
         # no@example.com is the best customer in the file and still excluded.
         self.assertNotIn(

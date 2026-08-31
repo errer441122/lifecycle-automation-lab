@@ -133,7 +133,14 @@ def build_profiles(
                         "lifecycle_orders": a["orders"],
                         "lifecycle_monetary_eur": round(a["monetary"], 2),
                         "lifecycle_recommended_action": STAGE_ACTION[stage],
-                        "lifecycle_computed_at": as_of.isoformat(),
+                        # Two dates, because they answer different questions and
+                        # collapsing them into one is how a pinned reference date
+                        # stops being a disclosure. `computed_at` is when the
+                        # script ran; `as_of` is the date the recency was measured
+                        # from, and it is written onto the profile so anyone
+                        # reading it in the ESP can see it was pinned.
+                        "lifecycle_computed_at": date.today().isoformat(),
+                        "lifecycle_as_of": as_of.isoformat(),
                     },
                 },
             }

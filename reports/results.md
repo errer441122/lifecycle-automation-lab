@@ -86,6 +86,27 @@ same device any cohort analysis uses, and it is disclosed here rather than
 quietly baked in: nothing about the order was altered, only the date the
 recency is measured from.
 
+**It ran, and the whole chain held.** 31 August:
+
+```
+12:55  sync --as-of 2026-12-15 --live  ->  lifecycle_stage = "At risk"
+13:07  segment "At risk (lifecycle_stage)"  ->  1 profile
+13:15  3.1 "E passato un po. Il tuo caffe ti aspetta"  opened   flow WiNBzn
+```
+
+Roughly twelve minutes from a property written by a Python script to a segment
+membership, and eight more to an email opened. This is the bridge the whole
+repo is built around: the lifecycle model lives in code, not in the ESP, and
+the ESP reads its output as an ordinary profile property.
+
+Two things worth noticing in those timings. The segment re-indexed in about
+twelve minutes, not the hour this project had budgeted for after watching it
+on 28 August — the delay is variable and should not be treated as a constant.
+And the `Opened Email` event indexed *before* its own `Received Email`, which
+had still not appeared minutes later: Klaviyo's event feed is not ordered by
+causality, so a report that assumes it is will occasionally read as an email
+opened before it was sent.
+
 ## Flow activity
 
 | Flow | Entered | Delivered | Opened | Clicked | Orders | Unsub | Complaints |
@@ -95,7 +116,8 @@ recency is measured from.
 | Abandoned cart — 2.1 | 1 | **0 — skipped, Smart Sending** | | | | | |
 | Abandoned cart — 2.2 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | Abandoned cart — 2.3 | pending (1 Sep) — expected to be filtered, see below | | | | | | |
-| Win-back — 3.1 | not yet triggered | | | | | | |
+| Win-back — 3.1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| Win-back — 3.2 | pending (+7d) | | | | | | |
 
 Two deliveries, two opens, zero clicks, zero unsubscribes, zero complaints.
 Opens are counted here because they were pixel-fired on a real client; at n=2
@@ -423,6 +445,25 @@ live event back confirmed the key exists and holds a real Shopify recovery URL
 before the four-hour delay elapsed. A dead CTA in the one cart email this
 project actually sends would have been discovered by clicking it — which is
 the expensive way.
+
+### The disclosure was in the write-up and not on the profile
+
+The first win-back push wrote `lifecycle_computed_at = "2026-12-15"` — the
+pinned reference date, under a property name that says when the model ran.
+Anyone opening that profile in Klaviyo would read it as a computation made in
+December. The pinned date was disclosed honestly in this file and misrepresented
+on the record that people actually look at.
+
+Now two properties, because they answer different questions:
+
+```
+lifecycle_computed_at = "2026-08-31"   when the script ran
+lifecycle_as_of       = "2026-12-15"   what the recency was measured from
+```
+
+A test in [`../tests/test_sync_klaviyo.py`](../tests/test_sync_klaviyo.py)
+fails if they are ever collapsed back into one. A disclosure that lives only in
+the write-up is not a disclosure.
 
 ### Smaller ones, without the write-up
 

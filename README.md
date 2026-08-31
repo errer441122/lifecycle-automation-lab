@@ -9,19 +9,22 @@ This is the companion to that analysis: there I *measure* lifecycle and RFM,
 here I *operate* on them. The bridge between the two is
 [`src/sync_klaviyo.py`](src/sync_klaviyo.py).
 
-> **Status (2026-08-30).** Two of the three flows have been entered by real
-> events. Welcome: consent given on the form, confirmed by clicking the link,
-> email delivered 47 seconds later, opened 90 minutes after that. Abandoned
-> cart: a real storefront checkout, `Source Name: web`, and two emails due —
-> the first **skipped by Smart Sending** because the welcome had gone out five
-> hours earlier, the second **delivered and opened** a day later, once the
-> window had passed. Same profile, same flow, same setting; only the elapsed
-> time changed, which is what makes it evidence rather than a guess. It is the
-> most useful thing in [`reports/results.md`](reports/results.md), along with
-> the six other things that broke. One subscriber, one cart, two deliveries —
-> a working mechanism, not a measurement. The win-back cannot produce data
-> before December and that is stated rather than worked around. See
-> [Boundaries](#boundaries) for what is real here and what is not.
+> **Status (2026-08-31).** All three flows have now been entered by real
+> events and have delivered. Welcome: consent given on the form, confirmed by
+> clicking the link, email delivered 47 seconds later. Abandoned cart: a real
+> storefront checkout, `Source Name: web` — the first email **skipped by Smart
+> Sending** because the welcome had gone out five hours earlier, the second
+> delivered and opened a day later once the window had passed. Same profile,
+> same flow, same setting; only the elapsed time changed, which is what makes
+> it evidence rather than a guess. Win-back: a Python script wrote
+> `lifecycle_stage` onto a consenting profile, the segment picked it up twelve
+> minutes later, and the email was opened eight minutes after that — against a
+> **pinned reference date**, disclosed both here and on the profile itself.
+> Three deliveries and one subscriber: a working mechanism, not a measurement.
+> The exit condition is the one claim still unproven, and
+> [`reports/results.md`](reports/results.md) says why and names the experiment
+> that would settle it. See [Boundaries](#boundaries) for what is real here and
+> what is not.
 
 ## What is set up
 
