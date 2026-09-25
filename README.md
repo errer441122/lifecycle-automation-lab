@@ -1,5 +1,10 @@
 # Lifecycle Automation Lab
 
+> **In 30 seconds**
+> - **What:** three Klaviyo flows (welcome with double opt-in, abandoned cart, win-back) on a Shopify store, the win-back triggered by lifecycle stages computed in Python.
+> - **Proof:** all three have fired on real events and delivered. Consent is structural: the sync script cannot grant it, only refuse to act without it.
+> - **Open:** [results](reports/results.md) (what broke, including Smart Sending silently skipping an email) · [consent design](docs/consent.md) · [`src/sync_klaviyo.py`](src/sync_klaviyo.py)
+
 Consent-first e-commerce lifecycle automation, running on a live store with
 real events. Three flows in Klaviyo (welcome with double opt-in, abandoned
 cart, win-back), triggered by lifecycle segments computed with the same rules
