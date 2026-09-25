@@ -1,0 +1,4 @@
+# Normalise line endings so WSL/Windows checkouts don't create CRLF noise.
+* text=auto eol=lf
+*.png binary
+*.xlsx binary

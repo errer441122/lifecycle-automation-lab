@@ -1,4 +1,4 @@
-"""Build the seven flow email templates in Klaviyo from the copy in docs/.
+"""Render the seven flow email templates and check them against Klaviyo.
 
 Klaviyo's drag-and-drop editor has no HTML view, so assembling seven emails by
 hand means roughly nine block operations each. The Templates API accepts raw
@@ -52,8 +52,7 @@ API_REVISION = "2026-07-15"
 # sends. Creating a fresh template instead leaves an orphan in the library that
 # no flow references, because the Flows API is read-only (PATCH on
 # /api/flow-messages/{id} answers 405) and nothing can repoint the message at
-# it. Re-running with --live is therefore idempotent: edit the copy above, run,
-# and the live emails change.
+# it. These ids are what --verify reads back to detect drift.
 FLOW_TEMPLATES = {
     "1.1": "VLaLZm",
     "1.2": "RYqJVq",

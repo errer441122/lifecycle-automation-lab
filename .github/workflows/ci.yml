@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Unit tests (stdlib only, no network)
+        run: python -m unittest discover -s tests
+      - name: Templates render and sync dry-run works end to end
+        run: |
+          python src/build_templates.py --out build/
+          python src/sync_klaviyo.py --as-of 2026-06-01 --report build/sync_report.json

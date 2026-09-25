@@ -42,6 +42,24 @@ class TestLifecycleStage(unittest.TestCase):
             self.assertIn(stage, sk.STAGE_ACTION)
 
 
+class TestReadOrders(unittest.TestCase):
+    def test_orders_after_as_of_are_ignored(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "orders.csv"
+            path.write_text(
+                "email,order_date,order_value_eur\n"
+                "a@example.com,2026-01-10,10\n"
+                "a@example.com,2026-07-01,99\n",
+                encoding="utf-8",
+            )
+            agg = sk.read_orders(path, date(2026, 6, 1))
+            self.assertEqual(agg["a@example.com"]["orders"], 1)
+            self.assertEqual(agg["a@example.com"]["last"], date(2026, 1, 10))
+            # Without as_of every row counts (backwards compatible).
+            self.assertEqual(sk.read_orders(path)["a@example.com"]["orders"], 2)
+
+
 class TestConsentGate(unittest.TestCase):
     """Consent is a hard gate applied before anything else."""
 

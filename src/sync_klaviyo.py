@@ -64,11 +64,15 @@ def lifecycle_stage(recency_days: int, orders: int) -> str:
     return "Churned"
 
 
-def read_orders(path: Path) -> dict[str, dict]:
+def read_orders(path: Path, as_of: date | None = None) -> dict[str, dict]:
     """Aggregate an orders export to one row per email.
 
     Expected columns: email, order_date (YYYY-MM-DD), order_value_eur.
     A Shopify export needs renaming to these three; see data/README.md.
+
+    Orders dated after `as_of` are ignored: with a pinned --as-of they have
+    not happened yet, and counting them gives a negative recency that files
+    a lapsed customer as "New".
     """
     agg: dict[str, dict] = {}
     with path.open(newline="", encoding="utf-8") as fh:
@@ -77,6 +81,8 @@ def read_orders(path: Path) -> dict[str, dict]:
             if not email:
                 continue
             order_date = datetime.strptime(row["order_date"].strip(), "%Y-%m-%d").date()
+            if as_of and order_date > as_of:
+                continue
             value = float(row.get("order_value_eur") or 0)
             a = agg.setdefault(email, {"orders": 0, "last": order_date, "monetary": 0.0})
             a["orders"] += 1
@@ -199,7 +205,13 @@ def push(profiles: list[dict], list_id: str, api_key: str, live: bool) -> list[s
         except urllib.error.HTTPError as exc:
             # Klaviyo puts the useful part in the body, not the status line.
             detail = exc.read().decode("utf-8", "replace")[:500]
-            sys.exit(f"Klaviyo rejected the batch ({exc.code}): {detail}")
+            # Earlier batches were accepted and will import; say which, or a
+            # re-run double-imports them without anyone knowing.
+            sent = ", ".join(job_ids) or "none"
+            sys.exit(
+                f"Klaviyo rejected the batch starting at profile {start} "
+                f"({exc.code}): {detail}\nAlready accepted jobs: {sent}"
+            )
         job_ids.append(payload.get("data", {}).get("id", "accepted"))
         print(f"  sent batch of {len(batch)} profiles -> job {job_ids[-1]}")
     return job_ids
@@ -226,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
     as_of = (
         datetime.strptime(args.as_of, "%Y-%m-%d").date() if args.as_of else date.today()
     )
-    orders = read_orders(args.orders)
+    orders = read_orders(args.orders, as_of)
     consent = read_consent(args.consent)
     profiles, report = build_profiles(orders, consent, as_of)
 
