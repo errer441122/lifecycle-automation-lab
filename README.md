@@ -71,25 +71,61 @@ Full specification in [`docs/flows.md`](docs/flows.md).
 
 ## Screenshots
 
-Every screen below exists now. Capture each one, save it under the given
-filename, then replace the row with an image embed.
+Captured from the live Klaviyo account and Shopify admin on 2026-09-27.
 
-| Shot | File | Where |
-| --- | --- | --- |
-| Welcome flow canvas | `assets/flow-welcome.png` | Klaviyo → Flows → *1 - Welcome (double opt-in)* |
-| Abandoned cart canvas | `assets/flow-abandoned-cart.png` | Klaviyo → Flows → *2 - Abandoned cart* |
-| Win-back canvas | `assets/flow-winback.png` | Klaviyo → Flows → *3 - Win-back (At risk)* |
-| Abandoned-cart exit condition | `assets/flow-exit-condition.png` | Flow 2 → Trigger → Profile filters — the single most instructive shot in the set |
-| `At risk` segment definition | `assets/segment-at-risk.png` | Klaviyo → Lists & segments → *At risk (lifecycle_stage)* → Edit definition |
-| Double opt-in enforced on the list | `assets/klaviyo-double-optin.png` | Klaviyo → Lists → *Newsletter (double opt-in)* → Settings → Consent |
-| Shopify integration connected | `assets/klaviyo-shopify-integration.png` | Klaviyo → Integrations → Shopify |
-| Catalogue and inventory | `assets/shopify-products.png` | Shopify → Prodotti |
-| Seeded orders | `assets/shopify-orders.png` | Shopify → Ordini |
-| DNS authentication | `assets/dns-auth.png` | Terminal — `nslookup` output, not the vendor dashboard. See [deliverability](docs/deliverability.md) for why |
+### The three flows
 
-The last row is deliberate. After the wildcard incident documented in
-[`reports/results.md`](reports/results.md), screenshotting a green tick in a
-vendor UI is exactly the wrong evidence; the DNS answers are the evidence.
+**1 · Welcome (double opt-in)** — triggered by joining the double opt-in list, not by a form submit.
+
+![Welcome flow canvas](assets/flow-welcome.png)
+
+**2 · Abandoned cart** — 4h → 2.1 → 20h → 2.2 → 2 days → 2.3.
+
+![Abandoned cart flow canvas](assets/flow-abandoned-cart.png)
+
+**The exit condition** — the single most instructive shot in the set: the profile filter
+*Placed Order zero times since starting this flow* is re-evaluated before every send.
+
+![Abandoned-cart trigger with the Placed Order exit filter](assets/flow-exit-condition.png)
+
+**3 · Win-back (At risk)** — entered from a segment that an analysis model populates.
+
+![Win-back flow canvas](assets/flow-winback.png)
+
+### Segment and consent
+
+**`At risk` segment definition** — `lifecycle_stage equals At risk`, a property written by
+[`src/sync_klaviyo.py`](src/sync_klaviyo.py).
+
+![At risk segment definition](assets/segment-at-risk.png)
+
+**Double opt-in enforced on the list**, with global unsubscribe.
+
+![Newsletter list consent settings: double opt-in](assets/klaviyo-double-optin.png)
+
+### Store
+
+**Shopify integration connected**
+
+![Klaviyo integrations: Shopify enabled](assets/klaviyo-shopify-integration.png)
+
+**Catalogue and inventory**
+
+![Shopify products](assets/shopify-products.png)
+
+**Orders**
+
+![Shopify orders](assets/shopify-orders.png)
+
+### DNS authentication
+
+Public DNS answers, not a vendor dashboard. See [deliverability](docs/deliverability.md) for why.
+
+![nslookup output for NS delegation, DKIM CNAME and DMARC](assets/dns-auth.png)
+
+After the wildcard incident documented in [`reports/results.md`](reports/results.md),
+screenshotting a green tick in a vendor UI is exactly the wrong evidence; the DNS answers
+are the evidence.
 
 ## The bridge: analysis output to ESP segment
 
