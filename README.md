@@ -232,6 +232,14 @@ are documented in [`docs/deliverability.md`](docs/deliverability.md).
 - The example CSVs in `data/` use `example.com` addresses, which are reserved
   by RFC 2606 and cannot receive mail.
 
+## How I built this
+
+Built with AI coding assistants as a pair programmer: they drafted most of the
+code and docs. My part: choosing the business question and the data, setting
+up and running the Klaviyo/Shopify accounts and DNS, defining the rules
+(consent, triggers, timing), checking results against the source data and
+deciding what to report, including what did not work.
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
