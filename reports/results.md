@@ -1,9 +1,9 @@
 # Results
 
-> **First cycle ran on 2026-08-29.** The welcome path is closed end to end:
-> consent given, confirmed, flow triggered, email delivered. The cart and
-> win-back paths have not run — see *Flow activity* for why, stated rather than
-> estimated.
+> **Snapshot: 29 to 31 August 2026.** All three flows were entered by a real
+> event and delivered an email to the one subscriber on the list. Nothing here
+> has been updated since, so the rows marked *pending* show what was still
+> queued on 31 August.
 
 ## Setup
 
@@ -14,9 +14,9 @@
 | ESP | Klaviyo, free plan, connected to the store since 2026-08-27 |
 | Sending domain | `send.negozio-online.org` — **Active**, NS delegation live, DKIM published, DMARC `p=none` |
 | List | *Newsletter (double opt-in)* (`WZDGDT`), double opt-in on, unsubscribe global |
-| Segment | *At risk (lifecycle_stage)* (`TFJaA4`), 0 members |
+| Segment | *At risk (lifecycle_stage)* (`TFJaA4`), 1 profile after the 31 August sync against a pinned reference date (see *Sync*) |
 | List size | 1 consenting profile, confirmed through double opt-in |
-| Period observed | from 2026-08-29 15:46 UTC — one welcome cycle |
+| Period observed | 2026-08-29 15:46 UTC to 2026-08-31 |
 
 ### Seeded orders
 
@@ -37,7 +37,8 @@ Neither customer has marketing consent: the admin checkbox was left unticked
 on purpose, because consent belongs to the double opt-in form, not to a box
 ticked by whoever creates the record. Running the sync against this data
 therefore reports **0 eligible, 2 suppressed as `unknown`** — the gate doing
-its job, and the cheapest possible proof that it works.
+its job, and the cheapest possible proof that it works. (That was before the
+subscriber placed order #1004; the *Sync* section below has the later run.)
 
 ## Read this before the numbers
 
@@ -120,13 +121,11 @@ opened before it was sent.
 | Win-back — 3.1 | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
 | Win-back — 3.2 | pending (+7d) | | | | | | |
 
-Two deliveries, two opens, zero clicks, zero unsubscribes, zero complaints.
-Opens are counted here because they were pixel-fired on a real client; at n=2
-they say nothing about performance and are not offered as if they did.
-| Win-back | cannot run before December | | | | | | |
-
-One delivery. That is a mechanism working, not a measurement — see the section
-above.
+Three deliveries to one subscriber, zero clicks, zero orders from an email,
+zero unsubscribes, zero complaints. Opens are counted because they were pixel-fired
+on a real client; at this size they say nothing about performance and are not
+offered as if they did. That is a mechanism working, not a measurement — see
+the section above.
 
 ```
 15:41:33  Subscribed to List -> Email List                  (Shopify webhook, wrong list)
@@ -172,7 +171,7 @@ cart cannot show both. The condition is re-evaluated before every send, so any
 This run demonstrates the send. Reviewing the exit condition's design is fair;
 reading it as verified behaviour is not.
 
-The win-back cannot produce data until roughly December: it triggers on entry
+Without a pinned date the win-back cannot trigger until roughly December: it triggers on entry
 to `At risk`, which needs 91+ days since the last order, and the seeded orders
 are days old. `--as-of` exercises the model against a stated reference date,
 which is a disclosure, not a substitute for elapsed time.
