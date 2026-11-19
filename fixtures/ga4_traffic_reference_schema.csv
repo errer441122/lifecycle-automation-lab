@@ -1,0 +1,9 @@
+# ----------------------------------------
+# GA4 Traffic acquisition export (schema fixture)
+# ----------------------------------------
+Session source / medium,Session campaign,Sessions,Total users,Key events,Purchase revenue
+klaviyo / email,lifecycle_welcome,420,380,18,1620.00
+klaviyo / email,lifecycle_winback,190,175,9,710.00
+hubspot / email,b2b_nurture_q2,310,270,12,0.00
+meta / paid_social,prospecting_leadgen_q2,2100,1950,84,4890.00
+google / cpc,brand_exact,1400,1200,65,5900.00

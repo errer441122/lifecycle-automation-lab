@@ -1,11 +1,9 @@
-# Real exports never get committed - only the example files do. They hold
-# personal data, and so does every list the scripts write from them.
+# Never commit real customer exports or generated lists (PII)
 data/*.csv
-!data/*_example.csv
-reports/sync_report.json
 reports/*.csv
+reports/sync_report.json
+build/
 .env
 __pycache__/
 *.pyc
 .venv/
-build/

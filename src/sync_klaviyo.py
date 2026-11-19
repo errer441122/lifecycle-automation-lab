@@ -1,223 +1,131 @@
-"""Lifecycle stage -> Klaviyo profile property, behind a hard consent gate.
+"""GDPR-gated Lifecycle Sync for Klaviyo & HubSpot (from native platform CSV exports).
 
-The segmentation rules are the ones from the analysis repo
-(`digital-campaign-performance-dashboard/src/crm_lifecycle.py`): recency and
-order count map every customer to New / Repeat / At risk / Dormant / Churned.
-Here they run on the real orders of a live store instead of on the public
-dataset, and the resulting stage is written to Klaviyo as a profile property.
+Reads unmodified exports from:
+- Orders: Shopify Orders (Orders > Export) or canonical orders CSV
+- Consent/Audience: Klaviyo Lists & Segments Export, HubSpot Contacts Export,
+  Shopify Customers Export, or canonical consent CSV
 
-What this script does NOT do, on purpose:
+Assigns lifecycle stages (New, Repeat, At risk, Dormant, Churned) using either
+standard 90/180/365-day rules or dynamically calibrated thresholds derived from
+the store's real second-order interval (`--auto-thresholds`), applies a hard
+GDPR Art. 7(1) consent & Double Opt-In leak gate, and outputs:
+- Klaviyo profile import CSV (or live bulk-import API push with `--live`)
+- HubSpot contact import CSV (`--hubspot-out`)
+- GDPR suppression list CSV with exact suppression reasons (`--suppressed`)
 
-* It never grants marketing consent. A Klaviyo bulk import writes profile
-  data; it does not subscribe anyone to email marketing. Consent is collected
-  only by the double opt-in signup form (`docs/consent.md`). This script just
-  refuses to touch anyone who has not already opted in.
-* It never invents an email address. Rows without one are reported, not
-  guessed. The public dataset used in the analysis repo is anonymous
-  (customer ids, no contacts), which is exactly why it cannot be synced.
+What this script never does:
+- It never grants marketing consent or subscribes anyone.
+- Dry-run is the default everywhere: without `--live` it opens no socket.
 
-It reads a store's own files: the orders export straight from Shopify
-(Orders > Export, no editing needed) and the consent export from the signup
-form or ESP. Besides the Klaviyo sync it can write the suppression list, one
-row per person held back and why, for the team to exclude from campaigns.
-
-Segments and flows live in Klaviyo, not here: the property set below is read
-by a Klaviyo segment definition, and the flow triggers on segment entry. See
-`docs/flows.md`.
-
-Pure standard library.
+Pure Python standard library.
 """
 
 from __future__ import annotations
 
 import argparse
-import csv
-import io
 import json
 import os
 import sys
 import urllib.error
 import urllib.request
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
+import platform_io as pio
+import repeat_timing as rt
+
 API_ROOT = "https://a.klaviyo.com/api/profile-bulk-import-jobs"
-# Klaviyo pins behaviour to a dated revision; bumping it is a deliberate act.
 API_REVISION = "2026-07-15"
-# Klaviyo caps a bulk import at 10k profiles / 5MB. Stay well under both.
 BATCH_SIZE = 1000
 
 LIFECYCLE_ORDER = ["New", "Repeat", "At risk", "Dormant", "Churned"]
 STAGE_ACTION = {
-    "New": "Onboarding / second-purchase nudge",
-    "Repeat": "Loyalty / cross-sell flow",
-    "At risk": "Win-back sequence",
+    "New": "Onboarding / second-purchase nudge (no discount)",
+    "Repeat": "Loyalty / cross-sell flow (protect full-price margin)",
+    "At risk": "Win-back sequence (eligible for controlled offer)",
     "Dormant": "Reactivation offer",
-    "Churned": "Low-cost reactivation, then sunset",
+    "Churned": "Final re-permission touch, then sunset",
 }
 ELIGIBLE_CONSENT = "opted_in"
 
-# A raw Shopify orders export (Orders > Export) is recognised by these columns.
-# It has one row per line item, and order-level fields sit on the first row.
-SHOPIFY_COLUMNS = {"Name", "Email", "Created at", "Total"}
-NOT_A_SALE = {"refunded", "voided"}  # Shopify "Financial Status" values
-DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y")
-VALUE_COLUMNS = ("order_value_eur", "order_value", "value", "total", "order_value_gbp")
-FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+KLAVIYO_CSV_HEADER = [
+    "Email",
+    "lifecycle_stage",
+    "lifecycle_recency_days",
+    "lifecycle_orders",
+    "lifecycle_monetary",
+    "discount_eligible",
+    "lifecycle_recommended_action",
+    "lifecycle_as_of",
+    "consent_source",
+    "consent_timestamp",
+]
+HUBSPOT_CSV_HEADER = [
+    "Email",
+    "Lifecycle Stage Custom",
+    "Days Since Last Order",
+    "Orders Count",
+    "Total Historical Spend",
+    "Discount Eligible",
+    "Recommended CRM Action",
+    "Consent Verified",
+    "Consent Source",
+    "Consent Timestamp",
+]
+
+# Re-export helpers for clean imports in tests and callers.
+safe_cell = pio.safe_cell
+parse_day = pio.parse_day
+parse_amount = pio.parse_amount
 
 
-def safe_cell(text: str) -> str:
-    """A cell Excel would run as a formula gets a leading apostrophe. Emails and
-    sources come from sign-up forms, so they are user input."""
-    return "'" + text if text.startswith(FORMULA_START) else text
-
-
-def read_csv(path: Path) -> csv.DictReader:
-    """Rows of a CSV as real tools save it: comma, semicolon (Italian Excel) or
-    tab as separator, with or without the byte-order mark Excel adds."""
-    text = path.read_text(encoding="utf-8-sig")
-    header = text.split("\n", 1)[0]
-    return csv.DictReader(io.StringIO(text, newline=""), delimiter=max(",;\t", key=header.count))
-
-
-def parse_day(text: str | None) -> date | None:
-    """Date from "2026-05-20", "2026-05-20 14:03:00 +0200", "2026-05-20T14:03Z"
-    or "20/05/2026" (with or without a time); None if empty."""
-    text = (text or "").strip()
-    if not text:
-        return None
-    head = text.split()[0].split("T")[0]
-    for fmt in DATE_FORMATS:
-        try:
-            return datetime.strptime(head, fmt).date()
-        except ValueError:
-            pass
-    raise ValueError(f"date {text!r} is neither YYYY-MM-DD nor DD/MM/YYYY")
-
-
-def parse_amount(text: str | None) -> float:
-    """Number from "49.90", "49,90", "1.234,56" or "1,234.56" (currency signs ignored)."""
-    t = "".join(ch for ch in (text or "") if ch.isdigit() or ch in ",.-")
-    if not t:
-        return 0.0
-    if "," in t and "." in t:  # the separator that comes last is the decimal one
-        t = t.replace(".", "").replace(",", ".") if t.rfind(",") > t.rfind(".") else t.replace(",", "")
-    else:
-        t = t.replace(",", ".")
-    return float(t)
-
-
-def lifecycle_stage(recency_days: int, orders: int) -> str:
-    """Same thresholds as crm_lifecycle.real_lifecycle() in the analysis repo."""
-    if recency_days <= 90:
+def lifecycle_stage(
+    recency_days: int,
+    orders: int,
+    *,
+    active_days: int = 90,
+    at_risk_days: int = 180,
+    dormant_days: int = 365,
+) -> str:
+    if recency_days <= active_days:
         return "Repeat" if orders >= 2 else "New"
-    if recency_days <= 180:
+    if recency_days <= at_risk_days:
         return "At risk"
-    if recency_days <= 365:
+    if recency_days <= dormant_days:
         return "Dormant"
     return "Churned"
 
 
-def order_rows(path: Path):
-    """Yield (email, YYYY-MM-DD, value) once per order.
-
-    Reads this repo's simple format (email, order_date, order_value_eur) or a
-    raw Shopify orders export. In the Shopify file the line items of one order
-    are folded into one order, and cancelled, refunded and voided orders are
-    skipped: they are not purchases.
-    """
-    reader = read_csv(path)
-    columns = set(reader.fieldnames or ())
-    if not SHOPIFY_COLUMNS <= columns:
-        # Simple format. A customer id instead of an email is fine for the
-        # timing tool; the Klaviyo sync then has nobody it can write to.
-        who = next((c for c in ("email", "customer_id", "customer") if c in columns), "email")
-        value = next((c for c in VALUE_COLUMNS if c in columns), "order_value_eur")
-        for row in reader:
-            yield row.get(who), row.get("order_date"), row.get(value)
-        return
-    orders: dict[str, dict] = {}
-    for row in reader:
-        order = orders.setdefault(row["Name"], {})
-        for k, v in row.items():
-            if v and not order.get(k):
-                order[k] = v
-    for o in orders.values():
-        if o.get("Cancelled at") or o.get("Financial Status", "").lower() in NOT_A_SALE:
-            continue
-        yield o.get("Email"), o.get("Created at"), o.get("Total")
-
-
 def read_orders(path: Path, as_of: date | None = None) -> dict[str, dict]:
-    """Aggregate an orders export to one row per email.
-
-    Takes either file format order_rows() reads; see data/README.md.
-
-    Orders dated after `as_of` are ignored: with a pinned --as-of they have
-    not happened yet, and counting them gives a negative recency that files
-    a lapsed customer as "New".
-    """
-    agg: dict[str, dict] = {}
-    for email, day, value in order_rows(path):
-        email = (email or "").strip().lower()
-        order_date = parse_day(day)
-        if not email or order_date is None:
-            continue
-        if as_of and order_date > as_of:
-            continue
-        a = agg.setdefault(email, {"orders": 0, "last": order_date, "monetary": 0.0})
-        a["orders"] += 1
-        a["monetary"] += parse_amount(value)
-        if order_date > a["last"]:
-            a["last"] = order_date
-    return agg
+    """Read Shopify or canonical orders CSV and aggregate per customer email."""
+    _fmt, events = pio.read_order_events(path, as_of=as_of)
+    return pio.aggregate_orders_by_email(events)
 
 
 def read_consent(path: Path) -> dict[str, dict]:
-    """Consent record per email, as exported from the signup form / ESP.
-
-    Expected columns: email, consent_status, consent_source, consent_timestamp
-    (ISO 8601). Anything that is not exactly opted_in is treated as not
-    consenting; see build_profiles() for what an opted_in record also needs.
-    """
-    out: dict[str, dict] = {}
-    for row in read_csv(path):
-        email = (row.get("email") or "").strip().lower()
-        if email:
-            out[email] = {
-                "status": (row.get("consent_status") or "unknown").strip(),
-                "source": (row.get("consent_source") or "").strip(),
-                "timestamp": (row.get("consent_timestamp") or "").strip(),
-            }
-    return out
-
-
-def consent_date(timestamp: str) -> date | None:
-    """Date of a consent timestamp, or None if there is no readable date."""
-    try:
-        return parse_day(timestamp)
-    except ValueError:
-        return None
+    """Read Klaviyo, HubSpot, Shopify Customers, or canonical consent CSV."""
+    _fmt, profiles = pio.read_audience_consent(path)
+    return profiles
 
 
 def build_profiles(
-    orders: dict[str, dict], consent: dict[str, dict], as_of: date
+    orders: dict[str, dict],
+    consent: dict[str, dict],
+    as_of: date,
+    *,
+    active_days: int = 90,
+    at_risk_days: int = 180,
+    dormant_days: int = 365,
+    strict_double_optin: bool = False,
 ) -> tuple[list[dict], dict, list[tuple[str, str]]]:
-    """Return (profiles to sync, report, suppression list of (email, reason)).
-
-    The consent gate is hard: it is applied before anything else and is never
-    a scoring term. A customer with no consent record is suppressed as
-    unknown, not optimistically included. An opted_in record also needs a
-    source and a date on or before as_of: GDPR asks the shop to be able to
-    show how and when each person consented (Art. 7(1)), and a consent it
-    cannot show is treated as missing.
-    """
+    """Return (profiles to sync, report dict, suppression list of (email, reason))."""
     profiles: list[dict] = []
     held: list[tuple[str, str]] = []
     suppressed: dict[str, int] = defaultdict(int)
     by_stage: dict[str, int] = defaultdict(int)
     by_source: dict[str, int] = defaultdict(int)
+    single_optin_leaks: list[str] = []
 
     for email, a in sorted(orders.items()):
         record = consent.get(email, {})
@@ -226,15 +134,32 @@ def build_profiles(
             suppressed[status] += 1
             held.append((email, status))
             continue
-        given = consent_date(record.get("timestamp", ""))
+        given = pio._try_parse_day(record.get("timestamp", ""))
         if not record.get("source") or given is None or given > as_of:
             suppressed["opted_in_without_proof"] += 1
             held.append((email, "opted_in_without_proof"))
             continue
+        if record.get("single_optin_leak"):
+            single_optin_leaks.append(email)
+            if strict_double_optin:
+                suppressed["single_optin_unconfirmed_leak"] += 1
+                held.append((email, "single_optin_unconfirmed_leak"))
+                continue
+
         by_source[record["source"]] += 1
         recency = (as_of - a["last"]).days
-        stage = lifecycle_stage(recency, a["orders"])
+        stage = lifecycle_stage(
+            recency,
+            a["orders"],
+            active_days=active_days,
+            at_risk_days=at_risk_days,
+            dormant_days=dormant_days,
+        )
         by_stage[stage] += 1
+        # Only At risk / Dormant customers qualify for promotional discounts by default.
+        discount_eligible = stage in {"At risk", "Dormant"} and not (
+            a.get("full_price_only") and a["orders"] >= 3
+        )
         profiles.append(
             {
                 "type": "profile",
@@ -245,19 +170,13 @@ def build_profiles(
                         "lifecycle_recency_days": recency,
                         "lifecycle_orders": a["orders"],
                         "lifecycle_monetary_eur": round(a["monetary"], 2),
+                        "discount_eligible": discount_eligible,
                         "lifecycle_recommended_action": STAGE_ACTION[stage],
-                        # Two dates, because they answer different questions and
-                        # collapsing them into one is how a pinned reference date
-                        # stops being a disclosure. `computed_at` is when the
-                        # script ran; `as_of` is the date the recency was measured
-                        # from, and it is written onto the profile so anyone
-                        # reading it in the ESP can see it was pinned.
                         "lifecycle_computed_at": date.today().isoformat(),
                         "lifecycle_as_of": as_of.isoformat(),
-                        # Where and when the person consented, next to the
-                        # stage, so a segment can tell sign-up sources apart.
                         "consent_source": record["source"],
                         "consent_timestamp": record["timestamp"],
+                        "single_optin_leak_flag": bool(record.get("single_optin_leak")),
                     },
                 },
             }
@@ -265,14 +184,59 @@ def build_profiles(
 
     report = {
         "as_of": as_of.isoformat(),
+        "thresholds": {
+            "active_days": active_days,
+            "at_risk_days": at_risk_days,
+            "dormant_days": dormant_days,
+        },
+        "strict_double_optin": strict_double_optin,
         "customers_in_orders": len(orders),
         "eligible": len(profiles),
         "suppressed": sum(suppressed.values()),
-        "suppressed_by_reason": dict(suppressed),
+        "suppressed_by_reason": dict(sorted(suppressed.items())),
         "eligible_by_stage": {s: by_stage[s] for s in LIFECYCLE_ORDER if by_stage[s]},
         "eligible_by_consent_source": dict(sorted(by_source.items())),
+        "single_optin_leaks_detected": len(single_optin_leaks),
     }
     return profiles, report, held
+
+
+def to_klaviyo_csv(profiles: list[dict]) -> str:
+    rows = []
+    for p in profiles:
+        a = p["attributes"]["properties"]
+        rows.append([
+            p["attributes"]["email"],
+            a["lifecycle_stage"],
+            a["lifecycle_recency_days"],
+            a["lifecycle_orders"],
+            a["lifecycle_monetary_eur"],
+            str(a["discount_eligible"]).lower(),
+            a["lifecycle_recommended_action"],
+            a["lifecycle_as_of"],
+            a["consent_source"],
+            a["consent_timestamp"],
+        ])
+    return pio.to_csv_text(KLAVIYO_CSV_HEADER, rows)
+
+
+def to_hubspot_csv(profiles: list[dict]) -> str:
+    rows = []
+    for p in profiles:
+        a = p["attributes"]["properties"]
+        rows.append([
+            p["attributes"]["email"],
+            a["lifecycle_stage"],
+            a["lifecycle_recency_days"],
+            a["lifecycle_orders"],
+            a["lifecycle_monetary_eur"],
+            "Yes" if a["discount_eligible"] else "No",
+            a["lifecycle_recommended_action"],
+            "Verified",
+            a["consent_source"],
+            a["consent_timestamp"],
+        ])
+    return pio.to_csv_text(HUBSPOT_CSV_HEADER, rows)
 
 
 def _payload(batch: list[dict], list_id: str) -> dict:
@@ -290,10 +254,7 @@ def _payload(batch: list[dict], list_id: str) -> dict:
 
 
 def push(profiles: list[dict], list_id: str, api_key: str, live: bool) -> list[str]:
-    """POST the profiles in batches. Returns the accepted job ids.
-
-    Dry run is the default everywhere: without live=True this opens no socket.
-    """
+    """POST profiles in batches to Klaviyo API. Dry-run opens no socket."""
     job_ids: list[str] = []
     for start in range(0, len(profiles), BATCH_SIZE):
         batch = profiles[start : start + BATCH_SIZE]
@@ -315,10 +276,7 @@ def push(profiles: list[dict], list_id: str, api_key: str, live: bool) -> list[s
             with urllib.request.urlopen(req, timeout=30) as resp:
                 payload = json.loads(resp.read() or b"{}")
         except urllib.error.HTTPError as exc:
-            # Klaviyo puts the useful part in the body, not the status line.
             detail = exc.read().decode("utf-8", "replace")[:500]
-            # Earlier batches were accepted and will import; say which, or a
-            # re-run double-imports them without anyone knowing.
             sent = ", ".join(job_ids) or "none"
             sys.exit(
                 f"Klaviyo rejected the batch starting at profile {start} "
@@ -330,63 +288,75 @@ def push(profiles: list[dict], list_id: str, api_key: str, live: bool) -> list[s
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--orders", type=Path, default=Path("data/orders_example.csv"))
-    p.add_argument("--consent", type=Path, default=Path("data/consent_example.csv"))
-    p.add_argument("--list-id", default="", help="Klaviyo list id to attach profiles to")
-    p.add_argument(
-        "--as-of",
-        default="",
-        help="reference date YYYY-MM-DD for recency (default: today)",
-    )
-    p.add_argument(
-        "--live",
-        action="store_true",
-        help="actually call Klaviyo; without it nothing leaves the machine",
-    )
-    p.add_argument("--report", type=Path, default=Path("reports/sync_report.json"))
-    p.add_argument(
-        "--suppressed",
-        type=Path,
-        help="write the suppression list here (email, reason), e.g. reports/suppressed.csv",
-    )
+    p = argparse.ArgumentParser(description="GDPR-gated Lifecycle Sync for Klaviyo & HubSpot.")
+    p.add_argument("--orders", type=Path, default=Path("fixtures/shopify_orders_schema.csv"))
+    p.add_argument("--consent", type=Path, default=Path("fixtures/klaviyo_list_export_schema.csv"))
+    p.add_argument("--list-id", default="", help="Klaviyo list ID (required with --live)")
+    p.add_argument("--as-of", default="", help="Reference date YYYY-MM-DD (default: today)")
+    p.add_argument("--auto-thresholds", action="store_true", help="Calibrate active_days from second-order repeat timing")
+    p.add_argument("--strict-doi", action="store_true", help="Suppress single opt-in leaks (e.g., Shopify checkbox)")
+    p.add_argument("--live", action="store_true", help="Push to Klaviyo API (dry-run by default)")
+    p.add_argument("--report", type=Path, default=Path("build/sync_report.json"))
+    p.add_argument("--suppressed", type=Path, help="Write GDPR suppression list CSV")
+    p.add_argument("--klaviyo-out", type=Path, help="Write Klaviyo bulk-import CSV")
+    p.add_argument("--hubspot-out", type=Path, help="Write HubSpot contact import CSV")
     args = p.parse_args(argv)
 
-    as_of = (
-        datetime.strptime(args.as_of, "%Y-%m-%d").date() if args.as_of else date.today()
+    as_of = pio.parse_day(args.as_of) if args.as_of else date.today()
+    orders_fmt, events = pio.read_order_events(args.orders, as_of=as_of)
+    orders = pio.aggregate_orders_by_email(events)
+    consent_fmt, consent = pio.read_audience_consent(args.consent)
+
+    active_days = 90
+    if args.auto_thresholds:
+        days_map = defaultdict(set)
+        for ev in events:
+            days_map[ev["email"]].add(ev["order_date"])
+        timing = rt.repeat_timing(days_map)
+        active_days = timing["recommended_at_risk_days"]
+    at_risk_days = max(active_days * 2, 180)
+
+    profiles, report, held = build_profiles(
+        orders,
+        consent,
+        as_of,
+        active_days=active_days,
+        at_risk_days=at_risk_days,
+        strict_double_optin=args.strict_doi,
     )
-    orders = read_orders(args.orders, as_of)
-    consent = read_consent(args.consent)
-    profiles, report, held = build_profiles(orders, consent, as_of)
+    report["orders_format"] = orders_fmt
+    report["consent_format"] = consent_fmt
 
     print(json.dumps(report, indent=2))
     if args.suppressed:
         args.suppressed.parent.mkdir(parents=True, exist_ok=True)
-        with args.suppressed.open("w", newline="", encoding="utf-8") as fh:
-            w = csv.writer(fh, lineterminator="\n")
-            w.writerow(["email", "reason"])
-            w.writerows([safe_cell(email), reason] for email, reason in held)
-        who = "person" if len(held) == 1 else "people"
-        print(f"\nsuppression list ({len(held)} {who}) -> {args.suppressed}")
+        args.suppressed.write_text(
+            pio.to_csv_text(["email", "reason"], [[e, r] for e, r in held]),
+            encoding="utf-8",
+            newline="\n",
+        )
+    if args.klaviyo_out:
+        args.klaviyo_out.parent.mkdir(parents=True, exist_ok=True)
+        args.klaviyo_out.write_text(to_klaviyo_csv(profiles), encoding="utf-8", newline="\n")
+    if args.hubspot_out:
+        args.hubspot_out.parent.mkdir(parents=True, exist_ok=True)
+        args.hubspot_out.write_text(to_hubspot_csv(profiles), encoding="utf-8", newline="\n")
+
     if not profiles:
-        print("\nNothing eligible to sync - the consent gate suppressed everyone.")
+        print("\nNothing eligible to sync - consent gate suppressed all contacts.")
         return 0
 
-    # The key is read from the environment, never from a flag: a private key
-    # passed on the command line ends up in shell history and in `ps`.
     api_key = os.environ.get("KLAVIYO_API_KEY", "")
     if args.live and not api_key:
         sys.exit("KLAVIYO_API_KEY is not set - refusing to run --live.")
     if args.live and not args.list_id:
-        sys.exit("--list-id is required with --live, or the import lands nowhere.")
+        sys.exit("--list-id is required with --live.")
 
     print(f"\n{'LIVE' if args.live else 'DRY RUN'}: {len(profiles)} profiles")
     report["job_ids"] = push(profiles, args.list_id, api_key, args.live)
     report["mode"] = "live" if args.live else "dry-run"
-
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"\nreport -> {args.report}")
     return 0
 
 

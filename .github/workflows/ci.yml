@@ -14,13 +14,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Unit tests (stdlib only, no network)
-        run: python -m unittest discover -s tests
-      - name: Pre-send check on the seven flow emails
-        run: python src/pre_send_check.py
-      - name: Templates render and sync dry-run works end to end
+      - name: Unit tests (pure stdlib, no network)
+        run: python -m unittest discover -s tests -v
+      - name: Strict pre-flight QA on reference templates
+        run: python src/pre_send_check.py --strict
+      - name: End-to-end CLI smoke tests on Klaviyo, HubSpot & Shopify fixtures
         run: |
-          python src/build_templates.py --out build/
-          python src/sync_klaviyo.py --as-of 2026-06-01 --report build/sync_report.json
-          python src/sync_klaviyo.py --orders data/shopify_orders_example.csv --as-of 2026-06-01 --report build/shopify_report.json --suppressed build/suppressed.csv
-          python src/repeat_timing.py --orders data/shopify_orders_example.csv
+          python src/margin_guard.py \
+            --audience fixtures/klaviyo_list_export_schema.csv \
+            --orders fixtures/shopify_orders_schema.csv \
+            --discount-pct 15 --as-of 2026-06-01 --out build/klaviyo_preflight
+          python src/margin_guard.py \
+            --audience fixtures/hubspot_contacts_schema.csv \
+            --discount-pct 20 --as-of 2026-06-01 --out build/hubspot_preflight
+          python src/sync_klaviyo.py \
+            --orders fixtures/shopify_orders_schema.csv \
+            --consent fixtures/klaviyo_list_export_schema.csv \
+            --as-of 2026-06-01 --strict-doi \
+            --klaviyo-out build/klaviyo_sync.csv \
+            --hubspot-out build/hubspot_sync.csv \
+            --suppressed build/suppressed.csv \
+            --report build/sync_report.json
+          python src/repeat_timing.py --orders fixtures/shopify_orders_schema.csv

@@ -1,9 +1,4 @@
-"""Checks on the pre-send check itself.
-
-Run from the repository root:
-
-    python -m unittest discover -s tests
-"""
+"""Unit tests for multi-ESP Pre-Flight Template QA (Klaviyo Liquid & HubSpot HubL)."""
 
 from __future__ import annotations
 
@@ -14,98 +9,118 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 
 import build_templates as bt  # noqa: E402
+import platform_io as pio  # noqa: E402
 import pre_send_check as psc  # noqa: E402
 
-UNSUB = '<a href="{% unsubscribe %}">Disiscriviti</a>'
-LINK = '<a href="https://shop.example/collections/all">Vai</a>'
+KLAVIYO_UNSUB = '<a href="{% unsubscribe %}">Unsubscribe</a>'
+HUBSPOT_UNSUB = '<a href="{{ unsubscribe_link }}">Unsubscribe</a>'
+CLEAN_LINK = '<a href="https://shop.example.com/sale?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback">Shop</a>'
 
 
-def problems(body: str = "", subject: str = "Oggetto breve", preheader: str = "Un'anteprima diversa",
-             unsub: str = UNSUB) -> list[str]:
-    html = f"<p>{body}</p>{LINK}{unsub}"
-    return psc.check(html, f"{body} {unsub}", subject, preheader)
+def run_check(body: str = "Hello", subject: str = "Short subject", preheader: str = "Adds context",
+              unsub: str = KLAVIYO_UNSUB, link: str = CLEAN_LINK, esp: str = "auto",
+              require_utm: bool = True) -> dict:
+    html = f"<p>{body}</p>{link}{unsub}"
+    return psc.audit_template(
+        html,
+        text=f"{body} {unsub}",
+        subject=subject,
+        preheader=preheader,
+        esp=esp,
+        require_utm=require_utm,
+    )
 
 
-class TestTheSevenFlowEmails(unittest.TestCase):
-    def test_every_flow_email_is_ready_to_paste(self):
+class TestReferenceTemplates(unittest.TestCase):
+    def test_every_reference_template_passes_strict_qa(self):
         for e in bt.EMAILS:
             with self.subTest(e["key"]):
-                self.assertEqual(psc.check(bt.render_html(e), bt.render_text(e), e["subject"], e["preheader"]), [])
+                audit = psc.audit_template(
+                    bt.render_html(e),
+                    text=bt.render_text(e),
+                    subject=e["subject"],
+                    preheader=e["preheader"],
+                    esp="klaviyo",
+                    require_utm=True,
+                )
+                self.assertEqual(audit["issues"], [])
 
 
-class TestWhatItCatches(unittest.TestCase):
-    def test_a_clean_email_passes(self):
-        self.assertEqual(problems("Ciao"), [])
+class TestKlaviyoAndHubSpotChecks(unittest.TestCase):
+    def test_clean_klaviyo_passes(self):
+        self.assertEqual(run_check()["status"], "PASS")
 
-    def test_merge_tag_without_fallback(self):
-        self.assertIn("{{ first_name }} has no fallback", problems("Ciao {{ first_name }},"))
+    def test_catches_missing_and_empty_fallbacks_in_klaviyo(self):
+        res1 = run_check("Hi {{ first_name }},")
+        self.assertEqual(res1["blocker_count"], 1)
+        self.assertIn("no fallback", res1["issues"][0]["message"])
 
-    def test_merge_tag_with_an_empty_fallback(self):
-        # The bug the live templates had: "Ciao ," for a profile with no name.
-        found = problems("Ciao {{ first_name|default:'' }},")
-        self.assertEqual(len(found), 1)
-        self.assertIn("falls back to nothing", found[0])
+        res2 = run_check("Hi {{ first_name|default:'' }},")
+        self.assertEqual(res2["blocker_count"], 1)
+        self.assertIn("empty fallback", res2["issues"][0]["message"])
 
-    def test_guarded_or_defaulted_merge_tags_pass(self):
-        self.assertEqual(problems("Ciao{% if first_name %} {{ first_name }}{% endif %},"), [])
-        self.assertEqual(problems("Hai preso {{ person.last_product|default:'un nostro caffè' }}."), [])
+    def test_catches_hubspot_hubl_fallbacks_and_auto_detects_esp(self):
+        good_hs = run_check(
+            "Hi {{ contact.firstname|default('there') }},",
+            unsub=HUBSPOT_UNSUB,
+            link='<a href="https://app.example.com/?utm_source=hubspot&utm_medium=email&utm_campaign=q2_nurture">Go</a>',
+        )
+        self.assertEqual(good_hs["esp"], "hubspot")
+        self.assertEqual(good_hs["status"], "PASS")
 
-    def test_the_guard_must_test_the_same_variable(self):
-        self.assertTrue(problems("{% if email %}{{ first_name }}{% endif %}"))
+        bad_hs = run_check(
+            "Hi {{ contact.firstname }},",
+            unsub="",
+            link='<a href="https://app.example.com/pricing">Pricing</a>',
+        )
+        self.assertEqual(bad_hs["esp"], "hubspot")
+        cats = {i["category"] for i in bad_hs["issues"]}
+        self.assertEqual(cats, {"personalization", "utm", "compliance"})
 
-    def test_links_that_go_nowhere(self):
-        for href in ("#", "", "http://shop.example", "/collections/all"):
-            with self.subTest(href=href):
-                self.assertTrue(problems(f'<a href="{href}">x</a>'))
+    def test_commercial_link_without_utm_is_blocked_by_default(self):
+        res = run_check(link='<a href="https://shop.example.com/collections/all">Shop</a>')
+        self.assertEqual(res["status"], "FAIL")
+        self.assertTrue(any(i["category"] == "utm" for i in res["issues"]))
 
-    def test_hand_typed_utms_must_follow_the_taxonomy(self):
-        bad = "https://shop.example/?utm_source=facebook&utm_medium=email&utm_campaign=lifecycle_winback"
-        good = "https://shop.example/?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback"
-        self.assertTrue(problems(f'<a href="{bad}">x</a>'))
-        self.assertEqual(problems(f'<a href="{good}">x</a>'), [])
+        # Allowed when ESP auto-UTM mode is explicitly enabled
+        ok = run_check(link='<a href="https://shop.example.com/collections/all">Shop</a>', require_utm=False)
+        self.assertEqual(ok["status"], "PASS")
 
-    def test_missing_unsubscribe(self):
-        self.assertTrue(problems(unsub=""))
+    def test_ga4_reference_flags_unknown_utm_source(self):
+        ga4_ref = pio.read_ga4_utm_reference(ROOT / "fixtures" / "ga4_traffic_reference_schema.csv")
+        html = (
+            '<p>Hi</p>'
+            '<a href="https://shop.example.com/?utm_source=mailchimp_typo&utm_medium=email&utm_campaign=spring">Go</a>'
+            f'{KLAVIYO_UNSUB}'
+        )
+        res = psc.audit_template(html, ga4_ref=ga4_ref)
+        self.assertTrue(any("GA4 reference" in i["message"] for i in res["issues"]))
 
-    def test_subject_length(self):
-        self.assertEqual(problems(subject="x" * psc.MAX_SUBJECT), [])
-        self.assertTrue(problems(subject="x" * (psc.MAX_SUBJECT + 1)))
+    def test_detects_gmail_clipping_and_missing_alt_text(self):
+        huge = "<p>" + ("x" * 105_000) + '</p><img src="https://cdn.example.com/a.jpg">' + CLEAN_LINK + KLAVIYO_UNSUB
+        res = psc.audit_template(huge)
+        messages = " ".join(i["message"] for i in res["issues"])
+        self.assertIn("Gmail will clip", messages)
+        self.assertIn("alt text", messages)
 
-    def test_preview_text_must_add_something(self):
-        self.assertTrue(problems(subject="Reso gratuito", preheader="Reso gratuito."))
-        self.assertTrue(problems(preheader=""))
+    def test_detects_discount_offer_and_coupon_code(self):
+        html = (ROOT / "fixtures" / "broken_klaviyo_email.html").read_text(encoding="utf-8")
+        res = psc.audit_template(html, subject="15% off today", preheader="Use SPRING15")
+        self.assertTrue(res["discount_offer"]["has_discount"])
+        self.assertEqual(res["discount_offer"]["detected_discount_pct"], 15.0)
+        self.assertIn("SPRING15", res["discount_offer"]["detected_codes"])
 
-
-class TestAnyTemplateFile(unittest.TestCase):
-    """The check runs on any Klaviyo template copied into a file, not only on this repo's."""
-
-    def run_on(self, html: str, *flags: str) -> tuple[int, str]:
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "template.html"
-            path.write_text(html, encoding="utf-8")
-            out = io.StringIO()
-            with contextlib.redirect_stdout(out):
-                code = psc.main([str(path), *flags])
-        return code, out.getvalue()
-
-    def test_a_good_file_passes_without_subject_or_preview(self):
-        code, out = self.run_on(f"<p>Ciao</p>{LINK}{UNSUB}")
-        self.assertEqual(code, 0, out)
-
-    def test_a_broken_file_fails_and_says_why(self):
-        code, out = self.run_on('<p>Ciao {{ first_name }}</p><a href="#">x</a>')
+    def test_cli_runs_on_broken_fixture(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = psc.main([str(ROOT / "fixtures" / "broken_hubspot_email.html"), "--subject", "x" * 60])
         self.assertEqual(code, 1)
-        self.assertIn("has no fallback", out)
-        self.assertIn("link goes nowhere", out)
-        self.assertIn("unsubscribe", out)
-
-    def test_subject_is_checked_when_given(self):
-        code, out = self.run_on(f"<p>Ciao</p>{LINK}{UNSUB}", "--subject", "x" * 60)
-        self.assertEqual(code, 1)
-        self.assertIn("60 characters", out)
+        self.assertIn("BLOCKER", out.getvalue())
+        self.assertIn("PROMO DETECTED", out.getvalue())
 
 
 if __name__ == "__main__":

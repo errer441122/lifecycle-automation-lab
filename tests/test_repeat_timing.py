@@ -44,10 +44,9 @@ class TestRepeatTiming(unittest.TestCase):
     def test_runs_on_a_shopify_export_and_warns_when_the_file_is_small(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            code = rt.main(["--orders", str(ROOT / "data" / "shopify_orders_example.csv")])
+            code = rt.main(["--orders", str(ROOT / "fixtures" / "shopify_orders_schema.csv")])
         self.assertEqual(code, 0)
-        # The example covers five months: nobody has a full year yet.
-        self.assertIn("No customer has a full year", out.getvalue())
+        self.assertIn("No customer has a full 365-day observation window", out.getvalue())
 
 
 if __name__ == "__main__":

@@ -1,209 +1,101 @@
-# Lifecycle Automation Lab
+# ESP Pre-Flight QA, VIP Margin Guard & GDPR Consent Gate
 
-Three email flows built in Klaviyo on a Shopify development store: welcome with
-double opt-in, abandoned cart and win-back. I set up the accounts,
-authenticated the sending domain and sent the flows for real, to see what
-actually happens between "the flow is drawn" and "the email arrives".
+An operational pre-send governance toolkit for **Klaviyo**, **HubSpot**, **Shopify**, and **GA4** teams.
 
-## Use it on your own store
+ESPs send whatever is marked Live — they do not stop human deployment errors, single opt-in GDPR leaks, or promotional discounts accidentally shipped to VIPs who would buy at full price. This tool sits directly in front of campaign and flow launches, running on unmodified platform CSV exports in the browser or CLI.
 
-**[Open the tools in your browser](https://errer441122.github.io/lifecycle-automation-lab/)**:
-load your own CSV files, see the result, download the lists. The page runs
-this repository's Python in the browser, so nothing leaves your computer and
-nothing needs installing. Each tool has a "try it" button with the example
-files, which are only there to show what the output looks like.
+**[Launch the browser workbench (zero upload — runs locally via Pyodide)](https://errer441122.github.io/lifecycle-automation-lab/)**
 
-[![The tools page: the seven flow emails as a recipient sees them, and the second-order timing tool on 36,969 public orders](assets/tools_page.png)](https://errer441122.github.io/lifecycle-automation-lab/)
+---
 
-The page opens on the seven flow emails as a recipient sees them, with the
-Klaviyo tags filled in the way Klaviyo's own preview does. Below are the three
-tools, one tab each (in the picture, the second-order timing on the 36,969
-public UCI orders), and the three flows as built in Klaviyo.
+## Operational Gap Covered
 
-The same three tools run from the command line, where the lifecycle sync can
-also write to Klaviyo (with `--live` and an API key; never from the page):
+| Failure mode ESPs do not block | What this tool enforces before send |
+| --- | --- |
+| Personalization tags with missing or empty fallbacks (`Ciao {{ first_name\|default:'' }},` or `{{ contact.firstname }}`) | Blocks deploy across both **Klaviyo Liquid** and **HubSpot HubL** syntax |
+| Commercial links missing UTMs or breaking GA4 naming rules | Blocks un-tagged links and optionally cross-checks `utm_source` against an active **GA4 Traffic Acquisition** CSV |
+| Mobile subject truncation (>50 chars), duplicate preview text, Gmail clipping (>102 KB), missing `alt`, missing unsubscribe token | Structured `BLOCKER` / `WARNING` audit with non-zero CI exit code |
+| **Promotional discounts sent to VIPs & recent full-price buyers** | Auto-detects coupon/discount offers in the template, joins the audience export with **Shopify Orders**, extracts a **VIP Exclusion CSV**, and quantifies protected margin from historical AOV |
+| **GDPR Art. 7(1) & deliverability leaks** | Suppresses unsubscribed, hard-bounced, unconfirmed Double Opt-In, single opt-in leaks (e.g., Shopify checkout checkbox bypassing DOI), missing consent proof, and 365-day sunset profiles (<0.3% Google/Yahoo complaint threshold) |
 
-| Task | Command | What you get |
+---
+
+## Day-1 Native Platform Exports Supported
+
+Every parser auto-detects native column headers, UTF-8/UTF-16/Windows-1252 encodings, Excel semicolons, decimal commas (`49,90`), ISO and `DD/MM/YYYY` dates, and neutralizes CSV formula injection on all exports.
+
+| Platform | Native Export Accepted | Auto-Detected Fields Used |
 | --- | --- | --- |
-| Check a template before it goes live | `python src/pre_send_check.py email.html --subject "..."` | Every problem a recipient would see: a greeting that reads "Ciao ,", a dead link, a hand-typed UTM that breaks the naming rules, no unsubscribe link, a subject cut off on a phone |
-| Lifecycle stages from a Shopify orders export | `python src/sync_klaviyo.py --orders orders_export.csv --consent consent.csv --suppressed suppressed.csv` | Each customer's stage (New, Repeat, At risk, Dormant, Churned), written to Klaviyo only for people whose consent has a recorded source and date, plus the list of everyone held back and why |
-| Time the second-order email | `python src/repeat_timing.py --orders orders_export.csv` | The share of customers who order again by day 30, 60, 90, 180 and 365, and the delay to put in the post-purchase flow |
+| **Klaviyo** | *Lists & Segments > Export CSV* + HTML templates | `Email`, `Email Marketing Consent`, `Email Marketing Consent Timestamp`, `Email Marketing Consent Method`, `Email Marketing Double Opt-In`, `Email Suppression Reason`, `Historic Number Of Orders`, `Historic CLV`, `Last Open` |
+| **HubSpot** | *CRM > Contacts > Export CSV* + HubL HTML | `Email`, `Marketing contact status`, `Unsubscribed from all email`, `Email hard bounce reason`, `Legal basis for processing contact's data`, `Double opt-in status`, `Original Traffic Source`, `Number of Associated Deals`, `Total Revenue` |
+| **Shopify** | *Orders > Export* & *Customers > Export* | Multi-line-item folding on `Name`, exclusion of `Cancelled at` / `refunded` / `voided`, `Total`, `Discount Amount`, `Discount Code`, `Accepts Email Marketing` |
+| **GA4** | *Reports > Acquisition > Traffic acquisition > Export CSV* | Comment-row stripping + `Session source / medium`, `Session campaign` |
 
-The orders file is the Shopify export as it comes out of *Orders > Export*: the
-line items of each order are folded into one order, and cancelled, refunded and
-voided orders are left out. Files saved again by Excel work too: comma,
-semicolon or tab as separator, decimal commas (`49,90`, `1.234,50`), dates as
-`YYYY-MM-DD` or `DD/MM/YYYY`, with or without the byte-order mark, and in the
-browser also the older Windows encoding. Files and columns:
-[`data/README.md`](data/README.md).
+---
 
-So far the Shopify reading is tested on handwritten files in Shopify's export
-layout ([`data/shopify_orders_example.csv`](data/shopify_orders_example.csv)),
-not on a large store. The timing tool was also run on the 36,969 real orders of
-the public UCI dataset and gives the same result as my
-[analysis repo](https://github.com/errer441122/digital-campaign-performance-dashboard):
-3,359 customers with a full year of data, half of those who came back within 71
-days.
+## Immediate Operational Outputs
 
-## What is real and what is not
+1. **`vip_discount_exclusions.csv`** — Upload directly as an exclusion segment in Klaviyo or HubSpot for promotional sends; includes per-customer exclusion reason (`vip_high_frequency`, `vip_top_clv_tier`, `full_price_repeat_buyer`, `recent_buyer_cooldown_14d`) and estimated margin protected (`historical AOV × discount %`).
+2. **`gdpr_suppression_list.csv`** — Contacts blocked with explicit compliance/deliverability reason (`opted_out`, `hard_bounce`, `unconfirmed_doi`, `single_optin_unconfirmed_leak`, `missing_consent_proof`, `sunset_unengaged_365d`).
+3. **`safe_send_audience.csv`** + **`preflight_report.html`** + **`preflight_audit.json`** — Clean send-ready audience and PASS/FAIL pre-flight report.
+4. **`klaviyo_profile_sync.csv`** & **`hubspot_contact_sync.csv`** — Lifecycle stage (`New`, `Repeat`, `At risk`, `Dormant`, `Churned`) and `discount_eligible` properties ready for bulk import or live Klaviyo API push (`--live`, dry-run by default).
 
-| Real | Not real |
-| --- | --- |
-| A Klaviyo account with three live flows and seven emails | The store is a Shopify development store: password-protected, with no real customers |
-| A sending domain I authenticated myself (DKIM and DMARC), checked against the public DNS records | The orders in it were seeded by me |
-| A double opt-in list, and a rule that no profile is touched without consent | One subscriber, three delivered emails, no clicks and no sales |
+---
 
-So this repository shows that the mechanism works end to end. It does not show
-performance: there is no open rate, click rate or revenue worth reporting, and
-[the results](reports/results.md) report counts, never rates.
-
-## What I found by running it
-
-These only showed up because the flows were actually sent, not just drawn.
-
-1. **Smart Sending skipped the first abandoned-cart email.** A welcome email
-   had gone out five hours earlier, so Klaviyo held back the cart email. Nothing
-   in the reports said so: no send, no error. One screen in Klaviyo names the
-   reason. The next email in the same flow went out a day later, once the window
-   had passed.
-2. **Double opt-in on a list does not protect the list.** A sign-up through
-   Shopify's own newsletter field arrived in Klaviyo as subscribed straight
-   away, with no confirmation email. The setting only protects sign-ups that
-   come through the Klaviyo form.
-3. **A green "Verified" was not my configuration.** The first domain I tried
-   was parked on a resale marketplace that answered every DNS check. Klaviyo
-   showed the domain as verified although I had configured nothing. Since then
-   I check the DNS records myself instead of trusting the status column.
-
-One thing is still unproven: I have not yet seen the abandoned-cart flow stop
-when the customer completes the order, because Smart Sending got in the way of
-the one test I ran. The results describe the test that would settle it.
-
-Full write-up, including what else broke: [`reports/results.md`](reports/results.md).
-
-## Checking an email before it goes live
-
-[`src/pre_send_check.py`](src/pre_send_check.py) checks the seven emails before
-their HTML is pasted into Klaviyo, and any other Klaviyo template copied into a
-file: every personalisation tag has a fallback,
-every link is a real https address, any hand-typed UTM follows the
-[taxonomy](docs/flows.md#measurement), the unsubscribe link is there, the
-subject fits on a phone (50 characters) and the preview text adds something to
-it. CI runs it on every change.
-
-Its first run flagged all seven emails that were live. Six greeted the reader
-with `Ciao {{ first_name|default:'' }},`, which reads "Ciao , grazie..." for
-anyone who signed up without a first name, and the three cart emails had no
-fallback if Shopify's checkout link is missing. Both are fixed in this
-repository; the emails in Klaviyo change when the new HTML is pasted in.
-
-## The flows
-
-| # | Flow | Trigger | Steps |
-| --- | --- | --- | --- |
-| 1 | Welcome | Added to the double opt-in list, so only after confirmation | Day 0 → wait 3 days → Day 3 |
-| 2 | Abandoned cart | `Checkout Started`, with the filter *Placed Order zero times since starting this flow* re-checked before every send | 4h → email → 20h → email → 2 days → email |
-| 3 | Win-back | Entry into the `At risk` segment, which reads a profile property written by [`src/sync_klaviyo.py`](src/sync_klaviyo.py) | Day 0 → wait 7 days → Day 7 |
-
-Specification and the reason for each delay: [`docs/flows.md`](docs/flows.md).
-Consent design: [`docs/consent.md`](docs/consent.md).
-Domain authentication: [`docs/deliverability.md`](docs/deliverability.md).
-
-![Abandoned cart flow canvas](assets/flow-abandoned-cart.png)
-
-![Abandoned-cart trigger with the Placed Order exit filter](assets/flow-exit-condition.png)
-
-![Win-back flow canvas](assets/flow-winback.png)
-
-More screenshots (welcome flow, segment, double opt-in setting, DNS answers,
-Shopify admin) are in [`assets/`](assets).
-
-## How a customer enters the win-back
-
-Each customer gets a lifecycle stage based on the date of their last order.
-The stage is saved on the Klaviyo profile, a Klaviyo segment collects everyone
-who is "At risk", and entering that segment starts the win-back flow.
-
-```
-order history + consent  ->  lifecycle stage on the profile  ->  "At risk" segment  ->  win-back flow
-```
-
-| Stage | Rule |
-| --- | --- |
-| New | last order ≤ 90 days ago, 1 order |
-| Repeat | last order ≤ 90 days ago, ≥ 2 orders |
-| At risk | last order 91-180 days ago |
-| Dormant | last order 181-365 days ago |
-| Churned | last order > 365 days ago |
-
-The thresholds are the same as in my
-[CRM retention analysis](https://github.com/errer441122/digital-campaign-performance-dashboard).
-
-Consent comes first: only profiles that have already opted in are updated, and
-only if the consent record says where and when the consent was given, because
-under GDPR the shop must be able to show it. The source and date are written on
-the profile next to the lifecycle stage. Everyone held back is listed in a
-report, which also counts subscribers by sign-up source: that is where the
-Shopify checkbox subscribers from finding 2 show up. Nothing in this project
-can subscribe a person who did not ask for it.
-
-## Real-World Business Application (Next Steps)
-
-What I would do on a store with real customers.
-
-1. **Turn Smart Sending off on high-intent flows.** Smart Sending stops a
-   person from receiving two emails within a set window. That is right for
-   newsletters, but an abandoned cart is the moment the customer is closest
-   to buying. In this lab I left it on to document the behaviour, and it cost
-   the first cart email. On a real store I would switch it off for abandoned
-   cart and order emails, and keep it on for campaigns.
-2. **Use the segments to decide who gets a discount.** A discount sent to
-   everyone is paid mostly by people who would have bought anyway. The
-   win-back offer here goes only to customers whose last order was 91 to 180
-   days ago, and only once. Recent and loyal customers get content, not money
-   off.
-3. **Treat consent as a rule of the whole system, not one setting.** Double
-   opt-in on the list was not enough: the Shopify newsletter checkbox went
-   around it. On a real store I would send every sign-up source through the
-   same confirmed opt-in, keep the date and source of each consent, and check
-   the list for unconfirmed profiles regularly. Under GDPR the shop has to be
-   able to show how each person consented.
-4. **Measure with real traffic.** With one subscriber there is nothing to
-   measure. The next step is a store with real visitors, where each flow can be
-   judged on revenue per recipient and unsubscribe rate.
-
-## Run the example
-
-The lifecycle rules can be tried on the example data without any account:
+## CLI Usage (Pure Python 3.11 Standard Library — Zero Install)
 
 ```bash
-python -m unittest discover -s tests
-python src/pre_send_check.py
-python src/sync_klaviyo.py --orders data/shopify_orders_example.csv --as-of 2026-06-01 --suppressed reports/suppressed.csv
-python src/repeat_timing.py --orders data/shopify_orders_example.csv
+# 1. Run full pre-flight audit on a Klaviyo/HubSpot template + audience + Shopify orders
+python src/margin_guard.py \
+  --audience fixtures/klaviyo_list_export_schema.csv \
+  --orders fixtures/shopify_orders_schema.csv \
+  --template fixtures/broken_klaviyo_email.html \
+  --subject "15% off spring collection" \
+  --as-of 2026-06-01 \
+  --out build/preflight
+
+# 2. Standalone multi-ESP template QA (with optional GA4 UTM reference)
+python src/pre_send_check.py fixtures/broken_hubspot_email.html \
+  --subject "Upgrade now and save 20%" \
+  --ga4-ref fixtures/ga4_traffic_reference_schema.csv
+
+# 3. GDPR-gated lifecycle sync (dry-run by default; outputs Klaviyo + HubSpot CSVs)
+python src/sync_klaviyo.py \
+  --orders fixtures/shopify_orders_schema.csv \
+  --consent fixtures/klaviyo_list_export_schema.csv \
+  --as-of 2026-06-01 --strict-doi --auto-thresholds \
+  --klaviyo-out build/klaviyo_sync.csv \
+  --hubspot-out build/hubspot_sync.csv \
+  --suppressed build/gdpr_suppression_list.csv
+
+# 4. Run unit test suite
+python -m unittest discover -s tests -v
 ```
 
-The sync is a dry run: it prints who would be updated and who is held back for
-missing or unprovable consent, writes the suppression list, and sends nothing.
-The timing tool will say that the example covers only five months: it needs
-customers with a full year of data after their first order. Writing to a real Klaviyo account needs an
-API key and the `--live` flag.
+---
 
-## Boundaries
+## Repository Structure
 
-- No purchased, scraped or imported lists. The only recipient confirmed through
-  double opt-in.
-- The example CSVs use `example.com` addresses, which cannot receive mail.
-- The numbers are a snapshot from 31 August 2026.
+| Path | Purpose |
+| --- | --- |
+| `src/platform_io.py` | Auto-detecting native CSV readers for Shopify, Klaviyo, HubSpot, and GA4 |
+| `src/pre_send_check.py` | Multi-ESP template QA (Liquid & HubL), required UTM checks, and promo detection |
+| `src/margin_guard.py` | VIP / full-price discount protection & GDPR/deliverability pre-send audience gate |
+| `src/sync_klaviyo.py` | GDPR-gated lifecycle stage sync (Klaviyo API/CSV + HubSpot CSV) |
+| `src/repeat_timing.py` | Second-order timing curve used to calibrate At-risk thresholds from order history |
+| `src/web_app.py` & `docs/index.html` | Client-side Pyodide browser workbench (zero server upload) |
+| `fixtures/` | Minimal schema test fixtures (`example.com` only) for automated parser & QA tests |
+| `tests/` | Unit tests covering Klaviyo, HubSpot, Shopify, GA4, Excel quirks, and API dry-run safety |
+| `docs/field-notes/` | Hands-on Klaviyo, Shopify & DNS (DKIM/DMARC) QA field notes from a real sandbox deployment (Smart Sending collision, Shopify checkbox DOI bypass, DNS wildcard trap) |
 
-## How I built this
+---
 
-I am a Digital Marketing student, not a developer. The Python scripts were
-written mostly by AI coding assistants. My part was setting up and running the
-Klaviyo and Shopify accounts and the DNS, defining the rules (consent, triggers,
-timing), checking what was actually sent and deciding what to report, including
-what did not work.
+## Notes on Scope & Testing
 
-## Licence
+- All files in `fixtures/` are minimal **schema test fixtures** used solely to verify platform export parsing and QA rules in CI — they are not client lists or performance benchmarks.
+- Real exports are gitignored (`data/*.csv`, `build/`) and never leave the local machine when run through the CLI or browser app.
+- Live Klaviyo API writes require both `KLAVIYO_API_KEY` in the environment and the explicit `--live` flag; the sync script never grants marketing consent.
+
+## License
 
 MIT. See [LICENSE](LICENSE).

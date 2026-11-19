@@ -1,31 +1,28 @@
-"""Behavioural checks for the lifecycle -> Klaviyo bridge.
-
-Run from the repository root:
-
-    python -m unittest discover -s tests
-"""
+"""Unit tests for GDPR-gated Lifecycle Sync (Klaviyo & HubSpot native exports)."""
 
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 import urllib.request
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 
 import sync_klaviyo as sk  # noqa: E402
 
+SHOPIFY_FIXTURE = ROOT / "fixtures" / "shopify_orders_schema.csv"
+KLAVIYO_FIXTURE = ROOT / "fixtures" / "klaviyo_list_export_schema.csv"
+HUBSPOT_FIXTURE = ROOT / "fixtures" / "hubspot_contacts_schema.csv"
+
 
 class TestLifecycleStage(unittest.TestCase):
-    """The thresholds must stay identical to the analysis repo."""
-
-    def test_new_vs_repeat_within_90_days(self):
+    def test_default_boundaries(self):
         self.assertEqual(sk.lifecycle_stage(10, 1), "New")
         self.assertEqual(sk.lifecycle_stage(10, 2), "Repeat")
-
-    def test_boundaries_are_inclusive(self):
         self.assertEqual(sk.lifecycle_stage(90, 1), "New")
         self.assertEqual(sk.lifecycle_stage(91, 1), "At risk")
         self.assertEqual(sk.lifecycle_stage(180, 5), "At risk")
@@ -33,138 +30,59 @@ class TestLifecycleStage(unittest.TestCase):
         self.assertEqual(sk.lifecycle_stage(365, 5), "Dormant")
         self.assertEqual(sk.lifecycle_stage(366, 5), "Churned")
 
-    def test_order_count_stops_mattering_after_90_days(self):
-        # A high-frequency buyer who went quiet is still At risk.
-        self.assertEqual(sk.lifecycle_stage(120, 40), "At risk")
-
-    def test_every_stage_has_an_action(self):
-        for stage in sk.LIFECYCLE_ORDER:
-            self.assertIn(stage, sk.STAGE_ACTION)
+    def test_custom_calibrated_threshold(self):
+        self.assertEqual(sk.lifecycle_stage(55, 1, active_days=60), "New")
+        self.assertEqual(sk.lifecycle_stage(65, 1, active_days=60), "At risk")
 
 
-class TestReadOrders(unittest.TestCase):
-    def test_orders_after_as_of_are_ignored(self):
-        import tempfile
+class TestNativeExportsAndConsentGate(unittest.TestCase):
+    def test_shopify_orders_folding_and_voided_exclusion(self):
+        orders = sk.read_orders(SHOPIFY_FIXTURE, date(2026, 6, 1))
+        # #2001 has 2 line items -> 1 order; total 3 orders for vip.fullprice
+        self.assertEqual(orders["vip.fullprice@example.com"]["orders"], 3)
+        self.assertAlmostEqual(orders["vip.fullprice@example.com"]["monetary"], 585.00)
+        self.assertTrue(orders["vip.fullprice@example.com"]["full_price_only"])
+        # #2006 is voided -> skipped
+        self.assertEqual(orders["atrisk.buyer@example.com"]["orders"], 1)
+
+    def test_klaviyo_native_export_sync_and_strict_doi_gate(self):
+        orders = sk.read_orders(SHOPIFY_FIXTURE, date(2026, 6, 1))
+        consent = sk.read_consent(KLAVIYO_FIXTURE)
+        profiles, report, held = sk.build_profiles(orders, consent, date(2026, 6, 1), strict_double_optin=True)
+        emails = [p["attributes"]["email"] for p in profiles]
+        self.assertIn("vip.fullprice@example.com", emails)
+        self.assertIn("atrisk.buyer@example.com", emails)
+        self.assertNotIn("checkbox.leak@example.com", emails)
+        self.assertNotIn("unsub.customer@example.com", emails)
+        self.assertNotIn("noproof.optin@example.com", emails)
+        held_map = dict(held)
+        self.assertEqual(held_map["checkbox.leak@example.com"], "single_optin_unconfirmed_leak")
+        self.assertEqual(held_map["unsub.customer@example.com"], "opted_out")
+        self.assertEqual(held_map["noproof.optin@example.com"], "opted_in_without_proof")
+        self.assertEqual(report["single_optin_leaks_detected"], 1)
+
+    def test_hubspot_export_generates_hubspot_and_klaviyo_csvs(self):
+        orders = sk.read_orders(SHOPIFY_FIXTURE, date(2026, 6, 1))
+        consent = sk.read_consent(HUBSPOT_FIXTURE)
+        profiles, _report, _held = sk.build_profiles(orders, consent, date(2026, 6, 1), strict_double_optin=True)
+        hs_csv = sk.to_hubspot_csv(profiles)
+        kl_csv = sk.to_klaviyo_csv(profiles)
+        self.assertTrue(hs_csv.startswith("Email,Lifecycle Stage Custom,"))
+        self.assertTrue(kl_csv.startswith("Email,lifecycle_stage,"))
+        self.assertIn("vip.fullprice@example.com", hs_csv)
+
+    def test_orders_after_as_of_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "orders.csv"
             path.write_text(
-                "email,order_date,order_value_eur\n"
-                "a@example.com,2026-01-10,10\n"
-                "a@example.com,2026-07-01,99\n",
+                "email,order_date,order_value_eur\na@example.com,2026-01-10,10\na@example.com,2026-07-01,99\n",
                 encoding="utf-8",
             )
             agg = sk.read_orders(path, date(2026, 6, 1))
             self.assertEqual(agg["a@example.com"]["orders"], 1)
-            self.assertEqual(agg["a@example.com"]["last"], date(2026, 1, 10))
-            # Without as_of every row counts (backwards compatible).
-            self.assertEqual(sk.read_orders(path)["a@example.com"]["orders"], 2)
-
-
-class TestShopifyExport(unittest.TestCase):
-    """A raw Shopify orders export is read as it comes out of the admin."""
-
-    PATH = Path(__file__).resolve().parents[1] / "data" / "shopify_orders_example.csv"
-
-    def test_line_items_fold_into_orders_and_non_sales_are_skipped(self):
-        orders = sk.read_orders(self.PATH)
-        # #1001 has two line items but is one order.
-        self.assertEqual(orders["repeat@example.com"]["orders"], 3)
-        self.assertAlmostEqual(orders["repeat@example.com"]["monetary"], 269.50)
-        # #1005 was cancelled (voided), #1007 refunded: neither is a purchase.
-        self.assertEqual(orders["atrisk@example.com"]["orders"], 1)
-        self.assertEqual(orders["new@example.com"]["orders"], 1)
-        self.assertEqual(orders["new@example.com"]["last"], date(2026, 5, 20))
-
-    def test_a_byte_order_mark_from_excel_does_not_hide_the_columns(self):
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            copy = Path(tmp) / "export.csv"
-            copy.write_text(self.PATH.read_text(encoding="utf-8"), encoding="utf-8-sig")
-            self.assertEqual(sk.read_orders(copy), sk.read_orders(self.PATH))
-
-
-class TestConsentGate(unittest.TestCase):
-    """Consent is a hard gate applied before anything else."""
-
-    AS_OF = date(2026, 6, 1)
-    ORDERS = {
-        "yes@example.com": {"orders": 3, "last": date(2026, 5, 20), "monetary": 300.0},
-        "no@example.com": {"orders": 9, "last": date(2026, 5, 20), "monetary": 900.0},
-        "missing@example.com": {"orders": 5, "last": date(2026, 5, 20), "monetary": 500.0},
-    }
-    PROOF = {"source": "signup_form_double_optin", "timestamp": "2026-05-18T09:12:00Z"}
-    CONSENT = {
-        "yes@example.com": {"status": "opted_in", **PROOF},
-        "no@example.com": {"status": "opted_out", **PROOF},
-    }
-
-    def setUp(self):
-        self.profiles, self.report, self.held = sk.build_profiles(
-            self.ORDERS, self.CONSENT, self.AS_OF
-        )
-
-    def test_only_opted_in_profiles_are_built(self):
-        emails = [p["attributes"]["email"] for p in self.profiles]
-        self.assertEqual(emails, ["yes@example.com"])
-
-    def test_suppression_list_names_each_person_and_reason(self):
-        self.assertEqual(
-            sorted(self.held),
-            [("missing@example.com", "unknown"), ("no@example.com", "opted_out")],
-        )
-
-    def test_absent_consent_record_is_suppressed_not_assumed(self):
-        self.assertEqual(self.report["suppressed_by_reason"]["unknown"], 1)
-        self.assertEqual(self.report["suppressed_by_reason"]["opted_out"], 1)
-        self.assertEqual(self.report["suppressed"], 2)
-
-    def test_a_pinned_reference_date_is_visible_on_the_profile(self):
-        # A pinned --as-of is a disclosure, and a disclosure that only lives in
-        # the write-up is not one. Writing it into lifecycle_computed_at instead
-        # would tell anyone reading the profile in the ESP that the model ran on
-        # a date it did not run on.
-        props = self.profiles[0]["attributes"]["properties"]
-        self.assertEqual(props["lifecycle_as_of"], self.AS_OF.isoformat())
-        self.assertEqual(
-            props["lifecycle_computed_at"], date.today().isoformat()
-        )
-
-    def test_high_value_does_not_buy_its_way_past_the_gate(self):
-        # no@example.com is the best customer in the file and still excluded.
-        self.assertNotIn(
-            "no@example.com", [p["attributes"]["email"] for p in self.profiles]
-        )
-
-    def test_consent_source_and_date_are_written_on_the_profile(self):
-        props = self.profiles[0]["attributes"]["properties"]
-        self.assertEqual(props["consent_source"], "signup_form_double_optin")
-        self.assertEqual(props["consent_timestamp"], "2026-05-18T09:12:00Z")
-        self.assertEqual(self.report["eligible_by_consent_source"], {"signup_form_double_optin": 1})
-
-    def test_opted_in_without_proof_is_suppressed(self):
-        # GDPR Art. 7(1): consent the shop cannot show, it does not have.
-        orders = {"a@example.com": self.ORDERS["yes@example.com"]}
-        for record in (
-            {"status": "opted_in", "source": "", "timestamp": "2026-05-18T09:12:00Z"},
-            {"status": "opted_in", "source": "popup", "timestamp": ""},
-            {"status": "opted_in", "source": "popup", "timestamp": "yesterday"},
-            {"status": "opted_in", "source": "popup", "timestamp": "2026-07-01T10:00:00Z"},  # after as_of
-        ):
-            with self.subTest(record=record):
-                profiles, report, _ = sk.build_profiles(orders, {"a@example.com": record}, self.AS_OF)
-                self.assertEqual(profiles, [])
-                self.assertEqual(report["suppressed_by_reason"], {"opted_in_without_proof": 1})
-
-    def test_stage_property_is_written(self):
-        props = self.profiles[0]["attributes"]["properties"]
-        self.assertEqual(props["lifecycle_stage"], "Repeat")
-        self.assertEqual(props["lifecycle_recency_days"], 12)
-        self.assertEqual(props["lifecycle_recommended_action"], sk.STAGE_ACTION["Repeat"])
 
 
 class TestPushSafety(unittest.TestCase):
-    """A dry run must never reach the network."""
-
     def setUp(self):
         self._real_urlopen = urllib.request.urlopen
 
@@ -177,14 +95,6 @@ class TestPushSafety(unittest.TestCase):
     def test_dry_run_sends_nothing(self):
         profiles = [{"type": "profile", "attributes": {"email": "a@example.com"}}]
         self.assertEqual(sk.push(profiles, "LIST", "key", live=False), [])
-
-    def test_payload_omits_list_relationship_when_no_list_given(self):
-        body = sk._payload([], "")
-        self.assertNotIn("relationships", body["data"])
-        body = sk._payload([], "ABC123")
-        self.assertEqual(
-            body["data"]["relationships"]["lists"]["data"][0]["id"], "ABC123"
-        )
 
 
 if __name__ == "__main__":

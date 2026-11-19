@@ -112,7 +112,10 @@ EMAILS: list[dict] = [
             "Se cambi idea, il link per disiscriverti e in fondo a ogni email e "
             "funziona al primo clic.",
         ],
-        "cta": ("Scopri le monorigine", f"{SITE}/collections/all"),
+        "cta": (
+            "Scopri le monorigine",
+            f"{SITE}/collections/all?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_welcome&utm_content=step1_welcome",
+        ),
     },
     {
         "key": "1.2",
@@ -133,7 +136,10 @@ EMAILS: list[dict] = [
             "Non riesci a scegliere? Il Set degustazione 4x100g li mette a "
             "confronto senza impegnarti su un sacchetto intero.",
         ],
-        "cta": ("Vedi il set degustazione", f"{SITE}/collections/all"),
+        "cta": (
+            "Vedi il set degustazione",
+            f"{SITE}/collections/all?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_welcome&utm_content=step2_bestsellers",
+        ),
     },
     {
         "key": "2.1",
@@ -192,7 +198,10 @@ EMAILS: list[dict] = [
             "raccolto, quindi il profilo che ti piaceva potrebbe avere una "
             "versione nuova.",
         ],
-        "cta": ("Rivedi cosa hai preso", f"{SITE}/collections/all"),
+        "cta": (
+            "Rivedi cosa hai preso",
+            f"{SITE}/collections/all?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback&utm_content=step1_nudge",
+        ),
     },
     {
         "key": "3.2",
@@ -207,7 +216,10 @@ EMAILS: list[dict] = [
             "Se non fa per te nessun problema — non insistiamo oltre e questa e "
             "l'ultima email di riattivazione che ricevi.",
         ],
-        "cta": ("Usa il codice", f"{SITE}/collections/all"),
+        "cta": (
+            "Usa il codice",
+            f"{SITE}/collections/all?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback&utm_content=step2_offer",
+        ),
     },
 ]
 
