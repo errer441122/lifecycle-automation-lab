@@ -1,7 +1,0 @@
-Record ID,Email,First Name,Marketing contact status,Unsubscribed from all email,Email hard bounce reason,Legal basis for processing contact's data,Double opt-in status,Original Traffic Source,Marketing email confirmation date,Last marketing email open date,Number of Associated Deals,Total Revenue
-1001,vip.fullprice@example.com,Giulia,Marketing contact,false,,Freely given consent from contact,User clicked confirmation,ORGANIC_SEARCH,2025-10-10,2026-05-28,3,585.00
-1002,atrisk.buyer@example.com,Lukas,Marketing contact,false,,Freely given consent from contact,User clicked confirmation,PAID_SOCIAL,2026-01-20,2026-04-12,1,74.00
-1003,pending.doi@example.com,Anna,Marketing contact,false,,Freely given consent from contact,Confirmation pending,PAID_SOCIAL,2026-05-15,,0,0.00
-1004,unsub.customer@example.com,Elena,Marketing contact,true,,Freely given consent from contact,User clicked confirmation,DIRECT_TRAFFIC,2026-01-10,2026-02-20,1,140.00
-1005,nonmarketing@example.com,Luca,Non-marketing contact,false,,Legitimate interest - prospect/lead,User clicked confirmation,OFFLINE,2026-02-01,,0,0.00
-1006,bounced@example.com,Nina,Marketing contact,false,Mailbox does not exist,Freely given consent from contact,User clicked confirmation,PAID_SOCIAL,2026-03-01,,0,0.00

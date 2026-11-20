@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>ESP Pre-Flight QA, VIP Margin Guard &amp; GDPR Consent Gate</title>
-<meta name="description" content="Pre-send QA for Klaviyo & HubSpot templates, VIP discount exclusion guardrails, and GDPR Double Opt-In consent gating. Runs locally in your browser on native platform CSV exports.">
+<title>CRM Governance, Deliverability, VIP Margin Rules &amp; AI Pre-Send QA</title>
+<meta name="description" content="Real Klaviyo & DNS deliverability field notes, VIP margin protection matrix, GDPR Art. 7(1) consent SOP, and visual n8n AI Email Pre-Flight QA workflow.">
 <style>
 @font-face { font-family: "Geist"; src: url("fonts/geist-sans-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Geist"; src: url("fonts/geist-sans-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
@@ -14,7 +14,7 @@
 
 :root {
   color-scheme: light;
-  --page: #f5f6f4; --surface: #ffffff; --surface-2: #f9faf8; --ink: #111613; --ink-2: #46504a; --muted: #6c756f;
+  --page: #f5f6f4; --surface: #ffffff; --surface-2: #f8faf8; --ink: #111613; --ink-2: #46504a; --muted: #6c756f;
   --line: #dde2de; --accent: #0f6b4a; --accent-ink: #ffffff; --tint: #e8f3ee;
   --bad: #a8281b; --bad-tint: #fdece9; --warn: #945600; --warn-tint: #fef5e5;
 }
@@ -28,409 +28,152 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 15.5px/1.6 "Geist", system-ui, -apple-system, sans-serif; }
-code, pre, textarea { font-family: "Geist Mono", ui-monospace, monospace; }
+code, pre { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.9em; }
 a { color: var(--accent); text-underline-offset: 3px; }
-.wrap { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 header.nav { position: sticky; top: 0; z-index: 5; background: var(--page); border-bottom: 1px solid var(--line); }
-header.nav .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+header.nav .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
 .brand { font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: -0.02em; }
 .nav nav { display: flex; gap: 18px; font-size: 14px; }
 .nav nav a { color: var(--ink-2); text-decoration: none; }
-.nav nav a:hover { color: var(--ink); }
 .nav .src { margin-left: auto; font-size: 14px; }
 
-.hero { padding: 48px 0 28px; }
-.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
-h1 { font-size: clamp(28px, 4vw, 44px); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 12px; max-width: 24ch; }
-.lead { font-size: 17px; color: var(--ink-2); max-width: 68ch; margin: 0 0 18px; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
-.chip { font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); }
-.status { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; margin: 0; }
-.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.status.ok::before { background: var(--accent); }
-.status.err { color: var(--bad); }
-.status.err::before { background: var(--bad); }
-
-.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 18px; }
-.tabs button { font: inherit; font-size: 14.5px; font-weight: 600; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer; }
-.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 26px 28px; margin-bottom: 28px; }
-.panel[hidden] { display: none; }
-.panel h2 { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 6px; }
-.panel > p { color: var(--ink-2); margin: 0 0 18px; max-width: 76ch; }
-.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px 18px; margin-bottom: 16px; }
-.fields .full { grid-column: 1 / -1; }
-label { display: grid; gap: 5px; font-size: 13.5px; font-weight: 600; }
-label small { font-weight: 400; color: var(--muted); }
-input[type=text], input[type=number], input[type=date], select, textarea {
-  font: inherit; font-size: 14px; color: var(--ink); background: var(--surface-2);
-  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%;
-}
-textarea { min-height: 155px; font-size: 13px; resize: vertical; }
-input[type=file] { font-size: 13.5px; color: var(--ink-2); }
-.checkrow { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 16px; font-size: 14px; }
-.checkrow label { display: inline-flex; align-items: center; gap: 7px; font-weight: 500; cursor: pointer; }
+.hero { padding: 50px 0 30px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
+h1 { font-size: clamp(28px, 4.2vw, 44px); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 12px; max-width: 25ch; }
+.lead { font-size: 17px; color: var(--ink-2); max-width: 72ch; margin: 0 0 18px; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.btn { font: inherit; font-size: 14.5px; font-weight: 600; border-radius: 999px; padding: 9px 18px; cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
+.btn { display: inline-block; font: inherit; font-size: 14.5px; font-weight: 600; border-radius: 999px; padding: 10px 20px; text-decoration: none; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); }
 .btn.ghost { background: transparent; color: var(--accent); }
-.btn:disabled { opacity: .5; cursor: wait; }
 
-.out { margin-top: 22px; }
-.out:empty { display: none; }
-.banner { padding: 12px 16px; border-radius: 10px; font-weight: 600; margin-bottom: 16px; }
-.banner.ok { background: var(--tint); color: var(--accent); }
-.banner.bad { background: var(--bad-tint); color: var(--bad); }
-.banner.warn { background: var(--warn-tint); color: var(--warn); }
+section.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 30px; margin: 0 0 26px; }
+section.card h2 { font-size: 23px; letter-spacing: -0.02em; margin: 0 0 8px; }
+section.card > p { color: var(--ink-2); margin: 0 0 18px; max-width: 78ch; }
 
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 12px; margin: 14px 0 18px; }
-.kpi { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
-.kpi span { display: block; font-size: 12.5px; color: var(--muted); }
-.kpi b { display: block; font-size: 24px; line-height: 1.2; margin-top: 2px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+.box { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.box h3 { margin: 0 0 6px; font-size: 16px; }
+.box p { margin: 0; font-size: 14.5px; color: var(--ink-2); }
 
-.issue-list { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; }
-.issue-list li { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-size: 14px; }
-.tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; margin-right: 6px; vertical-align: 1px; }
-.tag.BLOCKER { background: var(--bad-tint); color: var(--bad); }
-.tag.WARNING { background: var(--warn-tint); color: var(--warn); }
-.tag.cat { background: var(--tint); color: var(--accent); }
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+.shots figure { margin: 0; }
+.shots img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.shots figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; }
 
-.scroll { overflow-x: auto; margin-top: 10px; }
+.scroll { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
-th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
-thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
-h3 { font-size: 16px; margin: 20px 0 6px; }
-.note { font-size: 13px; color: var(--muted); margin: 4px 0 10px; }
+th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+thead th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+.badge.ok { background: var(--tint); color: var(--accent); }
+.badge.bad { background: var(--bad-tint); color: var(--bad); }
+.badge.warn { background: var(--warn-tint); color: var(--warn); }
 
-footer { border-top: 1px solid var(--line); padding: 24px 0 44px; color: var(--ink-2); font-size: 13.5px; margin-top: 24px; }
-@media (max-width: 640px) { .wrap { padding: 0 16px; } .nav nav { display: none; } .panel { padding: 18px 16px; } }
+pre { margin: 12px 0 0; padding: 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); overflow-x: auto; font-size: 12.5px; }
+footer { border-top: 1px solid var(--line); padding: 24px 0 44px; color: var(--ink-2); font-size: 13.5px; }
+@media (max-width: 640px) { .wrap { padding: 0 16px; } .nav nav { display: none; } section.card { padding: 20px 16px; } }
 </style>
 </head>
 <body>
 <header class="nav"><div class="wrap">
-  <a class="brand" href="#top">ESP Pre-Flight &amp; Margin Guard</a>
+  <a class="brand" href="#top">CRM Governance &amp; AI Pre-Send QA</a>
   <nav>
-    <a href="#qa">Template QA</a>
-    <a href="#margin">VIP Margin &amp; GDPR Gate</a>
-    <a href="#sync">Lifecycle Sync</a>
+    <a href="#findings">Real Field Findings</a>
+    <a href="#qa">AI Pre-Flight Workflow</a>
+    <a href="#vip">VIP Margin Rules</a>
+    <a href="#flows">Live Flow Evidence</a>
   </nav>
-  <a class="src" href="https://github.com/errer441122/lifecycle-automation-lab">Source on GitHub</a>
+  <a class="src" href="https://github.com/errer441122/lifecycle-automation-lab">Repository on GitHub</a>
 </div></header>
 
 <main class="wrap" id="top">
   <section class="hero">
-    <p class="eyebrow">Martech Operations &middot; Pre-Send Governance</p>
-    <h1>Stop broken templates, GDPR leaks &amp; VIP discount waste before send.</h1>
-    <p class="lead">Runs directly on standard CSV exports from <strong>Klaviyo</strong>, <strong>HubSpot</strong>, <strong>Shopify</strong>, and <strong>GA4</strong>. Everything executes locally in your browser with Pyodide — customer data never leaves your computer.</p>
-    <div class="chips">
-      <span class="chip">Klaviyo Lists &amp; Liquid</span>
-      <span class="chip">HubSpot Contacts &amp; HubL</span>
-      <span class="chip">Shopify Orders &amp; Customers</span>
-      <span class="chip">GA4 UTM Taxonomy</span>
-      <span class="chip">Zero Server Upload</span>
+    <p class="eyebrow">Marketing Automation &middot; CRM Governance &amp; Deliverability</p>
+    <h1>Catch broken templates, consent leaks, and VIP discount waste before hitting Send.</h1>
+    <p class="lead">Built from real Klaviyo, Shopify, and Cloudflare DNS field testing &mdash; turned into a visual <strong>n8n AI Pre-Flight QA workflow</strong>, a <strong>VIP Margin Protection Matrix</strong>, and a 1-page Pre-Send SOP for Klaviyo &amp; HubSpot teams.</p>
+    <div class="actions">
+      <a class="btn" href="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/workflows/ai-email-preflight-qa.n8n.json" download="ai-email-preflight-qa.n8n.json">Download n8n QA Blueprint (.json)</a>
+      <a class="btn ghost" href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/sop-pre-send-qa-checklist.md">Read 1-Page Pre-Send SOP</a>
     </div>
-    <p class="status" id="status" role="status">Loading local Python engine (Pyodide)...</p>
   </section>
 
-  <div class="tabs" role="tablist" aria-label="Tools">
-    <button type="button" role="tab" id="tab-qa" aria-controls="qa" aria-selected="true">1. Template Pre-Flight QA</button>
-    <button type="button" role="tab" id="tab-margin" aria-controls="margin" aria-selected="false">2. VIP Margin &amp; GDPR Gate</button>
-    <button type="button" role="tab" id="tab-sync" aria-controls="sync" aria-selected="false">3. Lifecycle Sync &amp; Timing</button>
-  </div>
-
-  <!-- TAB 1: TEMPLATE PRE-FLIGHT QA -->
-  <section class="panel" role="tabpanel" id="qa" aria-labelledby="tab-qa">
-    <h2>Multi-ESP Template Pre-Flight QA</h2>
-    <p>Paste HTML from Klaviyo or HubSpot to catch missing merge-tag fallbacks, links missing GA4 UTMs, dead/HTTP URLs, missing unsubscribe tokens, mobile subject truncation (&gt;50 chars), Gmail clipping (&gt;102 KB), missing image <code>alt</code> attributes, and promotional offers requiring VIP exclusions.</p>
-    <div class="fields">
-      <label class="full">Template HTML <textarea id="qa-html" spellcheck="false" placeholder="Paste Klaviyo Liquid or HubSpot HubL HTML..."></textarea></label>
-      <label>Subject line <small>optional</small><input type="text" id="qa-subject" placeholder="e.g. 15% off spring collection"></label>
-      <label>Preview text <small>optional</small><input type="text" id="qa-preview" placeholder="Adds context beyond the subject"></label>
-      <label>ESP syntax <select id="qa-esp"><option value="auto">Auto-detect (Klaviyo / HubSpot)</option><option value="klaviyo">Klaviyo (Liquid)</option><option value="hubspot">HubSpot (HubL)</option></select></label>
-      <label>GA4 Traffic CSV <small>optional UTM source cross-check</small><input type="file" id="qa-ga4" accept=".csv,text/csv"></label>
+  <section class="card" id="findings">
+    <h2>1. Four Real Platform Failure Modes Caught Hands-On</h2>
+    <p>Discovered by actually authenticating a sending domain (<code>send.negozio-online.org</code>) and firing live Klaviyo flows connected to Shopify (full write-up in <code>docs/field-notes/</code>).</p>
+    <div class="grid-2">
+      <div class="box">
+        <h3>Smart Sending Silently Ate Cart Email 2.1</h3>
+        <p>A welcome email went out 5 hours earlier, so Klaviyo skipped the first abandoned-cart touch with zero errors in standard reports. <strong>Rule:</strong> turn Smart Sending OFF on high-intent cart touches; keep ON for newsletters.</p>
+      </div>
+      <div class="box">
+        <h3>Shopify Checkbox Bypassed Double Opt-In</h3>
+        <p>Setting Double Opt-In on a Klaviyo list only protects Klaviyo forms &mdash; Shopify's native checkbox subscribed contacts in 86ms without confirmation. <strong>Rule:</strong> isolate flow lists and audit <code>consent_source</code> + timestamp (GDPR Art. 7(1)).</p>
+      </div>
+      <div class="box">
+        <h3>A Green "Verified" DNS Badge Was a Wildcard</h3>
+        <p>A parked domain answered <code>_dmarc</code> with <code>v=spf1 -all</code> and turned Klaviyo green. Plus a Verified domain still needed manual Activation. <strong>Rule:</strong> always verify SPF/DKIM/DMARC via public DNS and raw headers.</p>
+      </div>
+      <div class="box">
+        <h3>Copy Promised What the Store Could Not Deliver</h3>
+        <p>Human proofreading missed "48h shipping" (unpublished SLA) and "valid 14 days" on a static coupon code, plus empty Liquid fallbacks. <strong>Fix:</strong> automated AI Copy-vs-Store-Policy QA before scheduling.</p>
+      </div>
     </div>
-    <div class="checkrow">
-      <label><input type="checkbox" id="qa-req-utm" checked> Require UTMs on commercial links</label>
-    </div>
-    <div class="actions">
-      <button class="btn" id="qa-run">Run Pre-Flight QA</button>
-      <button class="btn ghost" id="qa-fix-kl">Load Klaviyo broken fixture</button>
-      <button class="btn ghost" id="qa-fix-hs">Load HubSpot broken fixture</button>
-      <button class="btn ghost" id="qa-fix-ok">Load clean fixture</button>
-    </div>
-    <div class="out" id="qa-out" aria-live="polite"></div>
   </section>
 
-  <!-- TAB 2: VIP MARGIN & GDPR GATE -->
-  <section class="panel" role="tabpanel" id="margin" aria-labelledby="tab-margin" hidden>
-    <h2>VIP Margin Guard &amp; GDPR/Deliverability Audience Gate</h2>
-    <p>Upload a native audience export (<strong>Klaviyo List/Segment CSV</strong>, <strong>HubSpot Contacts CSV</strong>, or <strong>Shopify Customers CSV</strong>) and optionally your <strong>Shopify Orders export</strong>. Outputs ready-to-import exclusion &amp; suppression CSVs before launching a promotional campaign.</p>
-    <div class="fields">
-      <label>Audience CSV <small>Klaviyo / HubSpot / Shopify Customers</small><input type="file" id="mg-aud" accept=".csv,text/csv"></label>
-      <label>Shopify Orders CSV <small>optional (enriches LTV, cooldown &amp; full-price buyers)</small><input type="file" id="mg-ord" accept=".csv,text/csv"></label>
-      <label>Discount % <small>leave empty to auto-detect from Tab 1 template</small><input type="number" id="mg-disc" value="15" min="0" max="90" step="1"></label>
-      <label>VIP min orders <input type="number" id="mg-vip-ord" value="3" min="2" max="50"></label>
-      <label>Recent buyer cooldown (days) <input type="number" id="mg-cool" value="14" min="0" max="90"></label>
-      <label>Reference date <input type="date" id="mg-asof" value="2026-06-01"></label>
-    </div>
-    <div class="checkrow">
-      <label><input type="checkbox" id="mg-strict-doi" checked> Strict GDPR Double Opt-In (block single opt-in leaks like Shopify checkout checkbox)</label>
-      <label><input type="checkbox" id="mg-include-tpl"> Include HTML template from Tab 1 in audit</label>
-    </div>
-    <div class="actions">
-      <button class="btn" id="mg-run">Run Pre-Send Gate</button>
-      <button class="btn ghost" id="mg-fix-kl">Load Klaviyo + Shopify schema fixture</button>
-      <button class="btn ghost" id="mg-fix-hs">Load HubSpot schema fixture</button>
-    </div>
-    <div class="out" id="mg-out" aria-live="polite"></div>
+  <section class="card" id="qa">
+    <h2>2. Visual n8n AI Pre-Flight QA &amp; Policy Check</h2>
+    <p>Before scheduling any Klaviyo or HubSpot send, the draft + target exclusions run against <code>config/store-facts-and-promo-policy.json</code> and post a PASS or BLOCKED card to <code>#crm-qa</code>.</p>
+<pre>{
+  "status": "FAIL",
+  "has_discount_offer": true,
+  "blockers": [
+    { "category": "personalization", "issue": "{{ first_name|default:'' }} renders 'Ciao ,'", "fix": "Use conditional guard {% if first_name %}" },
+    { "category": "policy_mismatch", "issue": "Copy promises '48h shipping' (published_shipping_sla is null)", "fix": "Remove delivery SLA claim" },
+    { "category": "policy_mismatch", "issue": "Promises 'valid 14 days' on static code TORNA15", "fix": "Use dynamic per-recipient coupons or update copy" },
+    { "category": "vip_margin_guard", "issue": "15% offer missing VIP, Recent Buyer (14d) &amp; Active CX Hold exclusions", "fix": "Attach Exclusion - Protect Full-Price Margin segment" }
+  ]
+}</pre>
   </section>
 
-  <!-- TAB 3: LIFECYCLE SYNC & TIMING -->
-  <section class="panel" role="tabpanel" id="sync" aria-labelledby="tab-sync" hidden>
-    <h2>GDPR-Gated Lifecycle Sync &amp; Second-Order Timing</h2>
-    <p>Compute customer lifecycle stages (<code>New</code>, <code>Repeat</code>, <code>At risk</code>, <code>Dormant</code>, <code>Churned</code>) with <code>discount_eligible</code> flags from a native Shopify Orders export and Klaviyo/HubSpot consent export. Export ready-to-import CSVs for Klaviyo and HubSpot plus the GDPR suppression list.</p>
-    <div class="fields">
-      <label>Orders CSV <small>Shopify Orders &gt; Export or canonical CSV</small><input type="file" id="lc-ord" accept=".csv,text/csv"></label>
-      <label>Consent / Audience CSV <small>Klaviyo / HubSpot / Shopify Customers</small><input type="file" id="lc-con" accept=".csv,text/csv"></label>
-      <label>Reference date <input type="date" id="lc-asof" value="2026-06-01"></label>
+  <section class="card" id="vip">
+    <h2>3. VIP Margin Protection Matrix</h2>
+    <p>Stop paying blanket discounts to customers who already buy at full price or purchased last week.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Segment</th><th>Rule</th><th>Automatic Discount?</th><th>CRM Treatment</th></tr></thead>
+        <tbody>
+          <tr><td><strong>VIP / Champions</strong></td><td>&ge;3 orders or top 20% spend</td><td><span class="badge bad">NO &mdash; Exclude</span></td><td>Early access, loyalty previews, zero margin burn</td></tr>
+          <tr><td><strong>Full-Price Repeat</strong></td><td>&ge;2 orders, 0 past coupons</td><td><span class="badge bad">NO &mdash; Exclude</span></td><td>Replenishment &amp; cross-sell recommendations</td></tr>
+          <tr><td><strong>Recent Buyers</strong></td><td>Ordered in last 14 days</td><td><span class="badge bad">NO &mdash; Cooldown</span></td><td>Post-purchase onboarding (avoids buyer remorse)</td></tr>
+          <tr><td><strong>At Risk / Dormant</strong></td><td>Last order 91&ndash;365 days ago</td><td><span class="badge ok">YES &mdash; Controlled</span></td><td>Single win-back offer, once per customer</td></tr>
+          <tr><td><strong>Unengaged (&gt;365d)</strong></td><td>No open/click/order in 1 year</td><td><span class="badge warn">Sunset</span></td><td>Suppress to stay under 0.3% spam complaint ceiling</td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="checkrow">
-      <label><input type="checkbox" id="lc-strict-doi" checked> Block unconfirmed single opt-in leaks</label>
-      <label><input type="checkbox" id="lc-auto" checked> Auto-calibrate At-risk threshold when &ge;1 year of order history is present</label>
+  </section>
+
+  <section class="card" id="flows">
+    <h2>4. Hands-On Klaviyo Flow &amp; Exit-Filter Evidence</h2>
+    <p>Real canvases configured in Klaviyo (sandbox store &mdash; zero synthetic performance rates reported).</p>
+    <div class="shots">
+      <figure>
+        <img src="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/assets/flow-abandoned-cart.png" alt="Klaviyo Abandoned Cart flow canvas">
+        <figcaption>Abandoned Cart: 4h &rarr; 20h &rarr; 2 days with Placed Order exit re-checked before every touch.</figcaption>
+      </figure>
+      <figure>
+        <img src="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/assets/flow-welcome.png" alt="Klaviyo Welcome flow canvas">
+        <figcaption>Welcome flow triggered only after confirmed Double Opt-In list addition.</figcaption>
+      </figure>
+      <figure>
+        <img src="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/assets/dns-auth.png" alt="Verified Cloudflare DNS DKIM/DMARC authentication">
+        <figcaption>Branded sending subdomain authenticated on Cloudflare (NS delegation, DKIM, DMARC).</figcaption>
+      </figure>
     </div>
-    <div class="actions">
-      <button class="btn" id="lc-run">Generate ESP Sync CSVs</button>
-      <button class="btn ghost" id="lc-fix">Load Klaviyo + Shopify schema fixture</button>
-    </div>
-    <div class="out" id="lc-out" aria-live="polite"></div>
   </section>
 </main>
 
 <footer><div class="wrap">
-  <p>Executes this repository's pure-Python standard-library modules locally via <a href="https://pyodide.org">Pyodide</a>. Schema fixtures use synthetic <code>example.com</code> addresses solely to validate platform export parsers and QA rules — never presented as live campaign results. Live Klaviyo API sync (<code>--live</code>) runs from CLI only.</p>
+  <p>CRM Governance Playbook, real Klaviyo/DNS field notes, and n8n AI Pre-Flight QA workflow by Riccardo Capanna. Full repository: <a href="https://github.com/errer441122/lifecycle-automation-lab">github.com/errer441122/lifecycle-automation-lab</a>.</p>
 </div></footer>
-
-<script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js" integrity="sha384-4X7gSPzQ4pHfjTE5aBEPJAQcHu55sciq+NWO3OUOZ3zHSJhn4te9CBjUyRSr+nei" crossorigin="anonymous"></script>
-<script>
-"use strict";
-const REPO = "errer441122/lifecycle-automation-lab";
-const BASE = location.hostname.endsWith("github.io") ? `https://raw.githubusercontent.com/${REPO}/main/` : "../";
-const FILES = ["platform_io.py", "build_templates.py", "pre_send_check.py", "margin_guard.py", "repeat_timing.py", "sync_klaviyo.py", "web_app.py"];
-const $ = (id) => document.getElementById(id);
-
-const tabs = [...document.querySelectorAll("[role=tab]")];
-function openTab(id) {
-  for (const t of tabs) {
-    const active = t.getAttribute("aria-controls") === id;
-    t.setAttribute("aria-selected", String(active));
-    $(t.getAttribute("aria-controls")).hidden = !active;
-  }
-}
-tabs.forEach((t) => t.addEventListener("click", () => openTab(t.getAttribute("aria-controls"))));
-document.querySelectorAll('header nav a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
-  e.preventDefault(); openTab(a.hash.slice(1));
-}));
-
-let pyPromise = null;
-function engine() {
-  if (!pyPromise) {
-    pyPromise = (async () => {
-      const py = await loadPyodide();
-      py.FS.mkdirTree("/app");
-      for (const f of FILES) {
-        const r = await fetch(BASE + "src/" + f);
-        if (!r.ok) throw new Error(`Failed loading ${f} (${r.status})`);
-        py.FS.writeFile(`/app/${f}`, await r.text());
-      }
-      py.runPython('import sys; sys.path.insert(0, "/app"); import web_app');
-      const s = $("status"); s.textContent = "Ready. Files stay locally in your browser."; s.className = "status ok";
-      return py;
-    })().catch((e) => {
-      pyPromise = null;
-      const s = $("status"); s.textContent = "Engine error: " + e.message; s.className = "status err";
-      throw e;
-    });
-  }
-  return pyPromise;
-}
-
-function el(tag, props = {}, ...children) {
-  const n = Object.assign(document.createElement(tag), props);
-  for (const c of children) n.append(c instanceof Node ? c : document.createTextNode(String(c)));
-  return n;
-}
-function download(name, text, mime) {
-  const a = el("a", { href: URL.createObjectURL(new Blob([text], { type: mime })), download: name });
-  document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-async function readFile(input) {
-  const f = input.files[0]; if (!f) return null;
-  const buf = await f.arrayBuffer();
-  try { return new TextDecoder("utf-8", { fatal: true }).decode(buf); }
-  catch { return new TextDecoder("windows-1252").decode(buf); }
-}
-async function fetchFixture(rel) {
-  const r = await fetch(BASE + rel);
-  if (!r.ok) throw new Error(`Could not load fixture ${rel}`);
-  return r.text();
-}
-function makeTable(header, rows, limit = 30) {
-  if (!rows.length) return el("p", { className: "note" }, "None.");
-  const shown = rows.slice(0, limit);
-  return el("div", { className: "scroll" }, el("table", {},
-    el("thead", {}, el("tr", {}, ...header.map((h) => el("th", {}, h)))),
-    el("tbody", {}, ...shown.map((r) => el("tr", {}, ...r.map((c) => el("td", {}, c)))))));
-}
-
-// TAB 1: Template QA
-async function runQA() {
-  const out = $("qa-out");
-  const html = $("qa-html").value;
-  if (!html.trim()) { out.replaceChildren(el("p", { className: "banner bad" }, "Paste an email HTML template or load a schema fixture first.")); return; }
-  const py = await engine();
-  let ga4Path = "";
-  const ga4Text = await readFile($("qa-ga4"));
-  if (ga4Text) { py.FS.writeFile("/tmp/ga4.csv", ga4Text); ga4Path = "/tmp/ga4.csv"; }
-  py.globals.set("_html", html);
-  py.globals.set("_subj", $("qa-subject").value);
-  py.globals.set("_pre", $("qa-preview").value);
-  py.globals.set("_esp", $("qa-esp").value);
-  py.globals.set("_utm", $("qa-req-utm").checked);
-  py.globals.set("_ga4", ga4Path);
-  const res = JSON.parse(py.runPython("web_app.check_template(_html, _subj, _pre, _esp, _utm, _ga4)"));
-  if (res.error) { out.replaceChildren(el("p", { className: "banner bad" }, res.error)); return; }
-  const cls = res.status === "PASS" ? "ok" : (res.status === "FAIL" ? "bad" : "warn");
-  const nodes = [
-    el("div", { className: `banner ${cls}` },
-      `Status: ${res.status} · ESP: ${res.esp.toUpperCase()} · ${res.blocker_count} blocker(s), ${res.warning_count} warning(s) · ${(res.html_bytes / 1024).toFixed(1)} KB`),
-  ];
-  if (res.discount_offer && res.discount_offer.has_discount) {
-    const pct = res.discount_offer.detected_discount_pct ? `${res.discount_offer.detected_discount_pct}%` : "offer";
-    const codes = res.discount_offer.detected_codes.length ? ` (codes: ${res.discount_offer.detected_codes.join(", ")})` : "";
-    nodes.push(el("div", { className: "banner warn" },
-      `Promotional offer detected (${pct}${codes}) — run Tab 2 (VIP Margin Guard) to exclude VIPs & recent full-price buyers before sending.`));
-  }
-  if (res.issues.length) {
-    nodes.push(el("ul", { className: "issue-list" }, ...res.issues.map((i) =>
-      el("li", {}, el("span", { className: `tag ${i.severity}` }, i.severity), el("span", { className: "tag cat" }, i.category), i.message))));
-  }
-  out.replaceChildren(...nodes);
-}
-$("qa-run").addEventListener("click", runQA);
-$("qa-fix-kl").addEventListener("click", async () => {
-  $("qa-html").value = await fetchFixture("fixtures/broken_klaviyo_email.html");
-  $("qa-subject").value = "Exclusive 15% discount on our entire spring catalog — limited time only!";
-  $("qa-preview").value = "";
-  await runQA();
-});
-$("qa-fix-hs").addEventListener("click", async () => {
-  $("qa-html").value = await fetchFixture("fixtures/broken_hubspot_email.html");
-  $("qa-subject").value = "Upgrade now and save 20%";
-  $("qa-preview").value = "Upgrade now and save 20%";
-  await runQA();
-});
-$("qa-fix-ok").addEventListener("click", async () => {
-  $("qa-html").value = await fetchFixture("fixtures/clean_klaviyo_email.html");
-  $("qa-subject").value = "New seasonal harvest is here";
-  $("qa-preview").value = "Small-lot release, no coupon required.";
-  await runQA();
-});
-
-// TAB 2: Margin & GDPR Gate
-async function runMargin(audText, ordText) {
-  const out = $("mg-out");
-  if (!audText) { out.replaceChildren(el("p", { className: "banner bad" }, "Select an audience CSV (Klaviyo, HubSpot, or Shopify Customers) or load a schema fixture.")); return; }
-  const py = await engine();
-  py.FS.writeFile("/tmp/aud.csv", audText);
-  let ordPath = "";
-  if (ordText) { py.FS.writeFile("/tmp/ord.csv", ordText); ordPath = "/tmp/ord.csv"; }
-  const useTpl = $("mg-include-tpl").checked;
-  py.globals.set("_aud", "/tmp/aud.csv");
-  py.globals.set("_ord", ordPath);
-  py.globals.set("_tpl", useTpl ? $("qa-html").value : "");
-  py.globals.set("_subj", useTpl ? $("qa-subject").value : "");
-  py.globals.set("_pre", useTpl ? $("qa-preview").value : "");
-  py.globals.set("_disc", $("mg-disc").value);
-  py.globals.set("_asof", $("mg-asof").value);
-  py.globals.set("_vip", Number($("mg-vip-ord").value || 3));
-  py.globals.set("_cool", Number($("mg-cool").value || 14));
-  py.globals.set("_doi", $("mg-strict-doi").checked);
-  const res = JSON.parse(py.runPython("web_app.preflight_guard(_aud, _ord, _tpl, _subj, _pre, _disc, _asof, _vip, _cool, _doi, True)"));
-  if (res.error) { out.replaceChildren(el("p", { className: "banner bad" }, res.error)); return; }
-  const s = res.summary;
-  const cls = s.gate_status === "PASS" ? "ok" : (s.gate_status.startsWith("BLOCKED") ? "bad" : "warn");
-  out.replaceChildren(
-    el("div", { className: `banner ${cls}` },
-      `Gate: ${s.gate_status} · Audience format: ${s.audience_format}${s.orders_format ? " + " + s.orders_format : ""}`),
-    el("div", { className: "kpis" },
-      el("div", { className: "kpi" }, el("span", {}, "Input audience"), el("b", {}, s.total_audience_input)),
-      el("div", { className: "kpi" }, el("span", {}, "Safe to send"), el("b", {}, s.safe_to_send)),
-      el("div", { className: "kpi" }, el("span", {}, "GDPR / Deliverability blocked"), el("b", {}, s.blocked_gdpr_deliverability)),
-      el("div", { className: "kpi" }, el("span", {}, "VIP margin exclusions"), el("b", {}, s.excluded_vip_margin_guard)),
-      el("div", { className: "kpi" }, el("span", {}, "Est. margin protected"), el("b", {}, s.est_margin_protected_total.toFixed(2)))
-    ),
-    el("div", { className: "actions" },
-      el("button", { className: "btn ghost", type: "button", onclick: () => download("vip_discount_exclusions.csv", res.vip_exclusions_csv, "text/csv") }, "Download vip_discount_exclusions.csv"),
-      el("button", { className: "btn ghost", type: "button", onclick: () => download("gdpr_suppression_list.csv", res.gdpr_suppressions_csv, "text/csv") }, "Download gdpr_suppression_list.csv"),
-      el("button", { className: "btn ghost", type: "button", onclick: () => download("safe_send_audience.csv", res.safe_audience_csv, "text/csv") }, "Download safe_send_audience.csv"),
-      el("button", { className: "btn ghost", type: "button", onclick: () => download("preflight_report.html", res.report_html, "text/html") }, "Download preflight_report.html")
-    ),
-    el("h3", {}, "VIP & Full-Price Discount Exclusions"),
-    makeTable(res.vip_exclusions_header, res.vip_exclusions),
-    el("h3", {}, "GDPR & Deliverability Suppressions"),
-    makeTable(res.gdpr_suppressions_header, res.gdpr_suppressions)
-  );
-}
-$("mg-run").addEventListener("click", async () => runMargin(await readFile($("mg-aud")), await readFile($("mg-ord"))));
-$("mg-fix-kl").addEventListener("click", async () => runMargin(
-  await fetchFixture("fixtures/klaviyo_list_export_schema.csv"),
-  await fetchFixture("fixtures/shopify_orders_schema.csv")
-));
-$("mg-fix-hs").addEventListener("click", async () => runMargin(
-  await fetchFixture("fixtures/hubspot_contacts_schema.csv"),
-  null
-));
-
-// TAB 3: Lifecycle Sync & Timing
-async function runSync(ordText, conText) {
-  const out = $("lc-out");
-  if (!ordText || !conText) { out.replaceChildren(el("p", { className: "banner bad" }, "Provide both an Orders CSV and a Consent/Audience CSV, or load the schema fixture.")); return; }
-  const py = await engine();
-  py.FS.writeFile("/tmp/lc_ord.csv", ordText);
-  py.FS.writeFile("/tmp/lc_con.csv", conText);
-  py.globals.set("_asof", $("lc-asof").value);
-  py.globals.set("_doi", $("lc-strict-doi").checked);
-  py.globals.set("_auto", $("lc-auto").checked);
-  const res = JSON.parse(py.runPython('web_app.lifecycle("/tmp/lc_ord.csv", "/tmp/lc_con.csv", _asof, _doi, _auto)'));
-  const tim = JSON.parse(py.runPython('web_app.timing("/tmp/lc_ord.csv")'));
-  if (res.error) { out.replaceChildren(el("p", { className: "banner bad" }, res.error)); return; }
-  const r = res.report;
-  const timingNote = tim.customers
-    ? `Full-year cohort: ${tim.customers} customers · median time to 2nd order: ${tim.median_days_if_back ?? "n/a"} days · recommended At-risk start: day ${tim.recommended_at_risk_days}`
-    : `Orders span less than 365 days — using default 90/180/365 lifecycle thresholds.`;
-  out.replaceChildren(
-    el("div", { className: "banner ok" },
-      `Detected ${r.orders_format} + ${r.consent_format} · ${r.eligible} eligible, ${r.suppressed} suppressed (${r.single_optin_leaks_detected} single opt-in leak detected).`),
-    el("p", { className: "note" }, timingNote),
-    el("div", { className: "actions" },
-      el("button", { className: "btn ghost", type: "button", onclick: () => download("klaviyo_profile_sync.csv", res.klaviyo_csv, "text/csv") }, "Download klaviyo_profile_sync.csv"),
-      el("button", { className: "btn ghost", type: "button", onclick: () => download("hubspot_contact_sync.csv", res.hubspot_csv, "text/csv") }, "Download hubspot_contact_sync.csv"),
-      el("button", { className: "btn ghost", type: "button", onclick: () => download("gdpr_suppression_list.csv", res.suppressed_csv, "text/csv") }, "Download gdpr_suppression_list.csv")
-    ),
-    el("h3", {}, "Eligible Profiles (Ready for ESP Import)"),
-    makeTable(res.header, res.profiles),
-    el("h3", {}, "Held Back by GDPR Consent Gate"),
-    makeTable(["email", "reason"], res.suppressed)
-  );
-}
-$("lc-run").addEventListener("click", async () => runSync(await readFile($("lc-ord")), await readFile($("lc-con"))));
-$("lc-fix").addEventListener("click", async () => runSync(
-  await fetchFixture("fixtures/shopify_orders_schema.csv"),
-  await fetchFixture("fixtures/klaviyo_list_export_schema.csv")
-));
-
-engine().catch(() => {});
-</script>
 </body>
 </html>

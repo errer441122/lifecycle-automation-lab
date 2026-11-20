@@ -1,100 +1,58 @@
-# ESP Pre-Flight QA, VIP Margin Guard & GDPR Consent Gate
+# CRM Governance, Deliverability, VIP Margin Rules & AI Pre-Send QA
 
-An operational pre-send governance toolkit for **Klaviyo**, **HubSpot**, **Shopify**, and **GA4** teams.
+An operational playbook and visual **n8n + AI Pre-Flight QA** workflow for **Klaviyo, HubSpot, and Shopify** teams — built directly from real platform failure modes discovered during hands-on DNS, Double Opt-In, and lifecycle flow execution.
 
-ESPs send whatever is marked Live — they do not stop human deployment errors, single opt-in GDPR leaks, or promotional discounts accidentally shipped to VIPs who would buy at full price. This tool sits directly in front of campaign and flow launches, running on unmodified platform CSV exports in the browser or CLI.
-
-**[Launch the browser workbench (zero upload — runs locally via Pyodide)](https://errer441122.github.io/lifecycle-automation-lab/)**
+**[Explore the interactive showcase & field notes](https://errer441122.github.io/lifecycle-automation-lab/)** · **[Download n8n AI Pre-Flight QA blueprint](workflows/ai-email-preflight-qa.n8n.json)**
 
 ---
 
-## Operational Gap Covered
+## 4 Real Platform Failure Modes Caught Hands-On
 
-| Failure mode ESPs do not block | What this tool enforces before send |
-| --- | --- |
-| Personalization tags with missing or empty fallbacks (`Ciao {{ first_name\|default:'' }},` or `{{ contact.firstname }}`) | Blocks deploy across both **Klaviyo Liquid** and **HubSpot HubL** syntax |
-| Commercial links missing UTMs or breaking GA4 naming rules | Blocks un-tagged links and optionally cross-checks `utm_source` against an active **GA4 Traffic Acquisition** CSV |
-| Mobile subject truncation (>50 chars), duplicate preview text, Gmail clipping (>102 KB), missing `alt`, missing unsubscribe token | Structured `BLOCKER` / `WARNING` audit with non-zero CI exit code |
-| **Promotional discounts sent to VIPs & recent full-price buyers** | Auto-detects coupon/discount offers in the template, joins the audience export with **Shopify Orders**, extracts a **VIP Exclusion CSV**, and quantifies protected margin from historical AOV |
-| **GDPR Art. 7(1) & deliverability leaks** | Suppresses unsubscribed, hard-bounced, unconfirmed Double Opt-In, single opt-in leaks (e.g., Shopify checkout checkbox bypassing DOI), missing consent proof, and 365-day sunset profiles (<0.3% Google/Yahoo complaint threshold) |
+These are not theoretical checklist items — every rule in this repository comes from real failures encountered while authenticating a real sending domain (`send.negozio-online.org` on Cloudflare) and running live flows in Klaviyo + Shopify (full write-up in [`docs/field-notes/klaviyo-shopify-field-notes.md`](docs/field-notes/klaviyo-shopify-field-notes.md)):
 
----
+1. **Smart Sending silently dropped the 1st abandoned-cart email:** A welcome email had gone out ~5 hours earlier, so Klaviyo skipped step 2.1 with zero errors in standard reports (only visible under *Recipient Activity → Skipped*). **Operational rule:** turn Smart Sending **OFF** on high-intent abandoned-cart steps; keep it **ON** for promotional newsletters.
+2. **Double Opt-In on a Klaviyo list did NOT protect the list:** A signup via Shopify's native newsletter checkbox bypassed the confirmation email and landed as `SUBSCRIBED` in 86 milliseconds. **Operational rule:** isolate flow-triggered lists from third-party checkbox syncs and audit `consent_source` + `consent_timestamp` continuously (GDPR Art. 7(1)).
+3. **A green "Verified" DNS badge was a parked-domain wildcard:** An Afternic wildcard TXT (`v=spf1 -all`) made Klaviyo mark `_dmarc` green even though nothing was configured, and a later **Verified** domain still had to be manually **Activated**. **Operational rule:** verify SPF/DKIM/DMARC via public DNS (`nslookup`) and raw headers — never trust a dashboard tick alone.
+4. **Well-written copy promised things the store could not deliver:** Drafts passed manual proofreading while claiming *"48h shipping"* (unpublished at checkout) and *"valid 14 days"* on a static coupon code, plus empty Liquid fallbacks (`Ciao {{ first_name|default:'' }},` rendering `"Ciao ,"`). **Operational fix:** automated **AI Copy-vs-Policy & VIP Margin Pre-Flight QA** before every send.
 
-## Day-1 Native Platform Exports Supported
-
-Every parser auto-detects native column headers, UTF-8/UTF-16/Windows-1252 encodings, Excel semicolons, decimal commas (`49,90`), ISO and `DD/MM/YYYY` dates, and neutralizes CSV formula injection on all exports.
-
-| Platform | Native Export Accepted | Auto-Detected Fields Used |
-| --- | --- | --- |
-| **Klaviyo** | *Lists & Segments > Export CSV* + HTML templates | `Email`, `Email Marketing Consent`, `Email Marketing Consent Timestamp`, `Email Marketing Consent Method`, `Email Marketing Double Opt-In`, `Email Suppression Reason`, `Historic Number Of Orders`, `Historic CLV`, `Last Open` |
-| **HubSpot** | *CRM > Contacts > Export CSV* + HubL HTML | `Email`, `Marketing contact status`, `Unsubscribed from all email`, `Email hard bounce reason`, `Legal basis for processing contact's data`, `Double opt-in status`, `Original Traffic Source`, `Number of Associated Deals`, `Total Revenue` |
-| **Shopify** | *Orders > Export* & *Customers > Export* | Multi-line-item folding on `Name`, exclusion of `Cancelled at` / `refunded` / `voided`, `Total`, `Discount Amount`, `Discount Code`, `Accepts Email Marketing` |
-| **GA4** | *Reports > Acquisition > Traffic acquisition > Export CSV* | Comment-row stripping + `Session source / medium`, `Session campaign` |
+![Live Klaviyo Abandoned Cart flow with Placed Order exit condition](assets/flow-abandoned-cart.png)
 
 ---
 
-## Immediate Operational Outputs
+## Automated Pre-Send QA Workflow (`workflows/ai-email-preflight-qa.n8n.json`)
 
-1. **`vip_discount_exclusions.csv`** — Upload directly as an exclusion segment in Klaviyo or HubSpot for promotional sends; includes per-customer exclusion reason (`vip_high_frequency`, `vip_top_clv_tier`, `full_price_repeat_buyer`, `recent_buyer_cooldown_14d`) and estimated margin protected (`historical AOV × discount %`).
-2. **`gdpr_suppression_list.csv`** — Contacts blocked with explicit compliance/deliverability reason (`opted_out`, `hard_bounce`, `unconfirmed_doi`, `single_optin_unconfirmed_leak`, `missing_consent_proof`, `sunset_unengaged_365d`).
-3. **`safe_send_audience.csv`** + **`preflight_report.html`** + **`preflight_audit.json`** — Clean send-ready audience and PASS/FAIL pre-flight report.
-4. **`klaviyo_profile_sync.csv`** & **`hubspot_contact_sync.csv`** — Lifecycle stage (`New`, `Repeat`, `At risk`, `Dormant`, `Churned`) and `discount_eligible` properties ready for bulk import or live Klaviyo API push (`--live`, dry-run by default).
-
----
-
-## CLI Usage (Pure Python 3.11 Standard Library — Zero Install)
-
-```bash
-# 1. Run full pre-flight audit on a Klaviyo/HubSpot template + audience + Shopify orders
-python src/margin_guard.py \
-  --audience fixtures/klaviyo_list_export_schema.csv \
-  --orders fixtures/shopify_orders_schema.csv \
-  --template fixtures/broken_klaviyo_email.html \
-  --subject "15% off spring collection" \
-  --as-of 2026-06-01 \
-  --out build/preflight
-
-# 2. Standalone multi-ESP template QA (with optional GA4 UTM reference)
-python src/pre_send_check.py fixtures/broken_hubspot_email.html \
-  --subject "Upgrade now and save 20%" \
-  --ga4-ref fixtures/ga4_traffic_reference_schema.csv
-
-# 3. GDPR-gated lifecycle sync (dry-run by default; outputs Klaviyo + HubSpot CSVs)
-python src/sync_klaviyo.py \
-  --orders fixtures/shopify_orders_schema.csv \
-  --consent fixtures/klaviyo_list_export_schema.csv \
-  --as-of 2026-06-01 --strict-doi --auto-thresholds \
-  --klaviyo-out build/klaviyo_sync.csv \
-  --hubspot-out build/hubspot_sync.csv \
-  --suppressed build/gdpr_suppression_list.csv
-
-# 4. Run unit test suite
-python -m unittest discover -s tests -v
+```mermaid
+flowchart LR
+    F["1. Submit Email Draft + Target Segment"] --> P["2. Load Store Facts & Promo Policy JSON"]
+    P --> AI["3. AI Pre-Flight QA (Liquid/HubL + UTMs + Policy + VIP Check)"]
+    AI --> G{"4. Zero Blockers?"}
+    G -- "PASS" --> OK["5. Slack #crm-qa: Approved to Schedule"]
+    G -- "FAIL" --> NO["6. Slack #crm-qa: BLOCKED + Exact Fix List"]
 ```
+
+### What the QA Gate Checks Before Launch
+- **Personalization & Syntax:** Missing or empty fallbacks in both **Klaviyo Liquid** (`{{ first_name }}`) and **HubSpot HubL** (`{{ contact.firstname }}`).
+- **GA4 UTM Hygiene:** Required lowercase `utm_source`, `utm_medium=email`, `utm_campaign` on all commercial links.
+- **Copy vs. Store Policy Truth Table:** Cross-checks claims against [`config/store-facts-and-promo-policy.json`](config/store-facts-and-promo-policy.json) so emails never promise unsupported shipping SLAs or incoherent coupon terms.
+- **VIP Margin Guardrail:** Automatically flags promotional discounts when `VIP / Champions`, `Full-Price Repeat Buyers`, `Purchased Last 14 Days`, or `Active CX Hold` are missing from the campaign exclusions ([`docs/vip-margin-protection-rules.md`](docs/vip-margin-protection-rules.md)).
+- **Mobile & Deliverability Basics:** Subject ≤50 chars, non-duplicate preheader, mandatory unsubscribe token, image `alt` text.
 
 ---
 
 ## Repository Structure
 
-| Path | Purpose |
+| Path | Content |
 | --- | --- |
-| `src/platform_io.py` | Auto-detecting native CSV readers for Shopify, Klaviyo, HubSpot, and GA4 |
-| `src/pre_send_check.py` | Multi-ESP template QA (Liquid & HubL), required UTM checks, and promo detection |
-| `src/margin_guard.py` | VIP / full-price discount protection & GDPR/deliverability pre-send audience gate |
-| `src/sync_klaviyo.py` | GDPR-gated lifecycle stage sync (Klaviyo API/CSV + HubSpot CSV) |
-| `src/repeat_timing.py` | Second-order timing curve used to calibrate At-risk thresholds from order history |
-| `src/web_app.py` & `docs/index.html` | Client-side Pyodide browser workbench (zero server upload) |
-| `fixtures/` | Minimal schema test fixtures (`example.com` only) for automated parser & QA tests |
-| `tests/` | Unit tests covering Klaviyo, HubSpot, Shopify, GA4, Excel quirks, and API dry-run safety |
-| `docs/field-notes/` | Hands-on Klaviyo, Shopify & DNS (DKIM/DMARC) QA field notes from a real sandbox deployment (Smart Sending collision, Shopify checkbox DOI bypass, DNS wildcard trap) |
+| `workflows/ai-email-preflight-qa.n8n.json` | 1-click importable 8-node n8n Pre-Flight QA & Slack approval workflow |
+| `config/store-facts-and-promo-policy.json` | Store truth table (returns, shipping SLA, promo rules, VIP exclusions, GA4 UTMs) |
+| `prompts/email-policy-qa-prompt.md` | Structured AI QA prompt (`temperature = 0.0`) & real before/after example |
+| `docs/vip-margin-protection-rules.md` | Full-price vs. discount eligibility decision matrix for Klaviyo & HubSpot |
+| `docs/sop-pre-send-qa-checklist.md` | 1-page Pre-Send QA, GDPR Art. 7(1) & Deliverability SOP |
+| `docs/field-notes/` | Complete hands-on Klaviyo, Shopify & DNS field notes (`klaviyo-shopify-field-notes.md`, `flows.md`, `consent.md`, `deliverability.md`, `email-copy.md`) |
+| `assets/` | Screenshots from the live Klaviyo flows, exit filters, Double Opt-In setup & DNS records |
+| `docs/index.html` | Interactive showcase & Pre-Send QA checklist (GitHub Pages) |
 
----
-
-## Notes on Scope & Testing
-
-- All files in `fixtures/` are minimal **schema test fixtures** used solely to verify platform export parsing and QA rules in CI — they are not client lists or performance benchmarks.
-- Real exports are gitignored (`data/*.csv`, `build/`) and never leave the local machine when run through the CLI or browser app.
-- Live Klaviyo API writes require both `KLAVIYO_API_KEY` in the environment and the explicit `--live` flag; the sync script never grants marketing consent.
+> *Honesty note:* The Klaviyo account, flows, and Cloudflare DNS records (`send.negozio-online.org`) documented in `docs/field-notes/` are real, tested on a Shopify development store with no real customers — which is why no open rates or revenue benchmarks are claimed anywhere in this repository.
 
 ## License
 

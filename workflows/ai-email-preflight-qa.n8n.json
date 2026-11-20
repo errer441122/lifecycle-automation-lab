@@ -1,0 +1,130 @@
+{
+  "name": "AI Email Pre-Flight QA, Policy Consistency & VIP Margin Guard",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Form / Webhook: Submit Campaign Draft",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [160, 280],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "email-preflight-qa",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "Receives campaign draft before launch: esp (klaviyo | hubspot), subject, preheader, html, target_segment_name, excluded_segments."
+    },
+    {
+      "id": "2",
+      "name": "Load Store Facts & Promo Policy Truth Table",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [420, 280],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "p1", "name": "returns_days", "value": 30, "type": "number" },
+            { "id": "p2", "name": "published_shipping_sla", "value": "none", "type": "string" },
+            { "id": "p3", "name": "active_promo_codes", "value": "TORNA15 (15% off, once per customer, static code - no per-user expiry)", "type": "string" },
+            { "id": "p4", "name": "required_utm_medium", "value": "email", "type": "string" },
+            { "id": "p5", "name": "vip_exclusions_required_on_promos", "value": "VIP Champions, Full-Price Repeat Buyers, Purchased Last 14 Days, Active CX Promo Hold", "type": "string" }
+          ]
+        }
+      },
+      "notes": "Mirrors config/store-facts-and-promo-policy.json so copy claims are audited against real store configuration."
+    },
+    {
+      "id": "3",
+      "name": "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 280],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'You are a CRM & Marketing Automation Pre-Flight QA auditor. Audit the email draft against technical QA rules AND the store policy truth table. Check: (1) Klaviyo Liquid / HubSpot HubL merge tags with missing or empty fallbacks, (2) commercial links missing UTMs or breaking lowercase GA4 naming, (3) mobile subject >50 chars or redundant preheader, (4) missing unsubscribe tag, (5) unsupported claims vs store facts (e.g., shipping SLA not published, rolling expiry promised on static code), (6) promotional discount detected without required VIP/Recent-Buyer/CX-Hold exclusions on the target segment. Return strictly JSON: status (PASS | FAIL), has_discount_offer (bool), blockers (array of {category, issue, fix}), warnings (array of {category, issue, fix}).' }, { role: 'user', content: JSON.stringify({ draft: $('Form / Webhook: Submit Campaign Draft').item.json.body, policy: $json }) } ] }) }}"
+      },
+      "notes": "Temperature 0.0 for deterministic rule checking + JSON output."
+    },
+    {
+      "id": "4",
+      "name": "Guard: Zero Blockers (PASS)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [940, 280],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ JSON.parse($json.choices?.[0]?.message?.content || '{}').status }}",
+              "rightValue": "PASS",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5",
+      "name": "Slack: PASS — Approved to Schedule (#crm-qa)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1200, 180],
+      "parameters": {
+        "channel": "#crm-qa",
+        "text": "=:white_check_mark: *Pre-Flight QA PASSED* (`{{ $('Form / Webhook: Submit Campaign Draft').item.json.body.esp }}`)\n*Subject:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.subject }}\n*Segment:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.target_segment_name }}\nReady to schedule after live seed-inbox check."
+      }
+    },
+    {
+      "id": "6",
+      "name": "Slack: BLOCKED — Fix Before Send (#crm-qa)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1200, 380],
+      "parameters": {
+        "channel": "#crm-qa",
+        "text": "=:octagonal_sign: *Pre-Flight QA BLOCKED* (`{{ $('Form / Webhook: Submit Campaign Draft').item.json.body.esp }}`)\n*Subject:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.subject }}\n*Blockers found:* {{ JSON.parse($('AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)').item.json.choices?.[0]?.message?.content || '{}').blockers?.length || 1 }}\nReview fix list before scheduling."
+      }
+    },
+    {
+      "id": "7",
+      "name": "Error Trigger: Failure Alert",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [160, 520],
+      "parameters": {}
+    },
+    {
+      "id": "8",
+      "name": "Slack: Alert #martech-alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [420, 520],
+      "parameters": {
+        "channel": "#martech-alerts",
+        "text": "=:warning: *Email Pre-Flight QA workflow error* at `{{ $json.execution.lastNodeExecuted }}`: {{ $json.execution.error.message }}"
+      }
+    }
+  ],
+  "connections": {
+    "Form / Webhook: Submit Campaign Draft": { "main": [[{ "node": "Load Store Facts & Promo Policy Truth Table", "type": "main", "index": 0 }]] },
+    "Load Store Facts & Promo Policy Truth Table": { "main": [[{ "node": "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)", "type": "main", "index": 0 }]] },
+    "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)": { "main": [[{ "node": "Guard: Zero Blockers (PASS)?", "type": "main", "index": 0 }]] },
+    "Guard: Zero Blockers (PASS)?": {
+      "main": [
+        [{ "node": "Slack: PASS — Approved to Schedule (#crm-qa)", "type": "main", "index": 0 }],
+        [{ "node": "Slack: BLOCKED — Fix Before Send (#crm-qa)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Error Trigger: Failure Alert": { "main": [[{ "node": "Slack: Alert #martech-alerts", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" }
+}
