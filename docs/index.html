@@ -247,7 +247,7 @@ footer a:hover { color: var(--accent); }
   <nav class="nav-links" aria-label="Projects">
     <a class="proj" href="https://errer441122.github.io/ai-visibility-audit-geo/">GEO audit</a>
     <a class="proj" href="https://errer441122.github.io/ai-inbound-lead-router/">Lead router</a>
-    <a class="proj" href="https://errer441122.github.io/ecommerce-cx-analytics/">CX promo guard</a>
+    <a class="proj" href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>
     <a href="https://github.com/errer441122/lifecycle-automation-lab">GitHub repo</a>
   </nav>
 </div></header>
@@ -370,7 +370,7 @@ _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
           <ul>
             <li><b>VIP and Champions:</b> 3 or more orders, or the top 20% by spend.</li>
             <li><b>Full-price repeat buyers:</b> 2 or more orders, never used a coupon.</li>
-            <li><b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/ecommerce-cx-analytics/">CX promo guard</a>.</li>
+            <li><b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>.</li>
           </ul>
           <pre class="seg-def">Klaviyo segment "Exclusion: Protect Full-Price Margin"
   Placed Order at least 3 times over all time
@@ -398,7 +398,7 @@ _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
   <section class="wrap band" id="files">
     <h2>The files</h2>
     <div class="files">
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go">open</span><span class="d">The 8-node pre-send workflow, ready to import</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go">open</span><span class="d">The 7-node pre-send workflow (+ standalone error-notifier.n8n.json), ready to import</span></a>
       <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/config/store-facts-and-promo-policy.json"><span class="p">config/store-facts-and-promo-policy.json</span><span class="go">open</span><span class="d">The store's truth table the gate reads</span></a>
       <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/prompts/email-policy-qa-prompt.md"><span class="p">prompts/email-policy-qa-prompt.md</span><span class="go">open</span><span class="d">Blocker and warning rules, JSON output</span></a>
       <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/vip-margin-protection-rules.md"><span class="p">docs/vip-margin-protection-rules.md</span><span class="go">open</span><span class="d">Who gets a discount and who does not</span></a>
@@ -415,7 +415,7 @@ _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
   <span class="who">Riccardo Capanna</span>
   <a href="https://errer441122.github.io/ai-visibility-audit-geo/">GEO audit</a>
   <a href="https://errer441122.github.io/ai-inbound-lead-router/">Lead router</a>
-  <a href="https://errer441122.github.io/ecommerce-cx-analytics/">CX promo guard</a>
+  <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>
   <a href="https://github.com/errer441122">GitHub</a>
   <a href="https://www.linkedin.com/in/riccardo-capanna-039a43415/">LinkedIn</a>
 </div></footer>
@@ -553,9 +553,16 @@ function select(i) {
 
 function slackText(template, d) {
   const text = template.replace(/^=/, "").replace(/\{\{([\s\S]*?)\}\}/g, (_, x) =>
-    /\.esp\b/.test(x) ? d.esp : /\.subject\b/.test(x) ? d.subject : /target_segment_name/.test(x) ? d.segment : /blockers/.test(x) ? String(d.blockers.length) : "...");
+    /\.esp\b/.test(x) ? d.esp
+    : /\.subject\b/.test(x) ? d.subject
+    : /target_segment_name/.test(x) ? d.segment
+    : /excluded_segments/.test(x) ? (d.excluded.filter(([, on]) => on).map(([n]) => n).join(", ") || "None")
+    : /blockers[\s\S]*\.map/.test(x) ? d.blockers.map(([cat, issue, fix]) => `• *${cat}*: ${issue} -> _Fix:_ ${fix}`).join("\n")
+    : /blockers/.test(x) ? String(d.blockers.length)
+    : "...");
   return esc(clean(text.replace(/:[a-z_]+:\s*/g, "")))
     .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
+    .replace(/_([^_]+)_/g, "<em>$1</em>")
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .split("\n").map((l) => `<p>${l}</p>`).join("");
 }
@@ -595,7 +602,7 @@ function draw() {
     d.className = "node" + (n.name.includes("PASS") ? " pass" : n.name.includes("BLOCKED") ? " fail" : t === "errorTrigger" || n.name.includes("martech") ? " err" : "");
     d.style.left = p.x + "px"; d.style.top = p.y + "px"; d.title = clean(n.name);
     const i = n.name.indexOf(": ");
-    const short = clean((i > -1 ? n.name.slice(i + 2) : n.name).replace(/\s*\((JSON|#crm-qa)\)/g, ""));
+    const short = clean((i > -1 ? n.name.slice(i + 2) : n.name).replace(/\s*\((JSON|#crm-qa|Safe Defaults)\)/g, ""));
     const kind = { httpRequest: "ai call", errorTrigger: "on error", set: "set" }[t] || t;
     d.innerHTML = `<span class="k">${esc(kind)}</span>${esc(short)}`;
     el.append(d);

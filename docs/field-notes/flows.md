@@ -36,12 +36,12 @@ Segment `At risk (lifecycle_stage)` is live with 0 members — correct, because
 no customer has yet aged past 90 days without ordering.
 
 **Bootstrap note.** Klaviyo's segment builder only offers profile properties
-that already exist on at least one profile, and `lifecycle_stage` is written by
-`src/sync_klaviyo.py`, which has never run in live mode. The property was
-therefore seeded by hand on one real profile, with the value the model actually
-computes for that customer (Giulia Rossi → `Repeat`: 2 orders, recency 0). No
-value was invented; the manual write only created the schema so the segment
-could be defined. Klaviyo took roughly an hour to index it.
+that already exist on at least one profile. Before any automated sync pushed
+`lifecycle_stage` live, the property was seeded by hand on one real profile
+with the exact stage corresponding to that customer's order history (Giulia Rossi
+→ `Repeat`: 2 orders, recency 0). No value was invented; the manual write only
+created the schema so the segment could be defined. Klaviyo took roughly an hour
+to index it.
 
 ---
 
@@ -112,8 +112,8 @@ first — it has the largest expected effect.
 ## Flow 3 — Win-back
 
 **Trigger:** entry into the `At risk` segment.
-**Entry condition:** `lifecycle_stage` equals `At risk` — the property written
-by [`../src/sync_klaviyo.py`](../src/sync_klaviyo.py).
+**Entry condition:** `lifecycle_stage` equals `At risk` — written as an ESP
+profile property from CRM recency segmentation.
 **Exit condition:** `Placed Order`, or leaving the segment.
 
 | Step | Wait | Content | Purpose |
@@ -153,7 +153,7 @@ cadence is a weekly re-sync, which also means the property carries
 Every link carries this UTM taxonomy, so flow traffic is separable from
 campaign traffic in GA4. Klaviyo's UTM tracking adds the parameters when the
 email is sent; a UTM typed into a template by hand must follow the same table,
-and `src/pre_send_check.py` refuses one that does not:
+and the n8n Pre-Flight QA workflow (`workflows/ai-email-preflight-qa.n8n.json`) flags any link that does not:
 
 | Parameter | Value |
 | --- | --- |

@@ -2,8 +2,10 @@
 
 Copy for all seven emails, ready to paste into the Klaviyo template editor.
 Subject lines (in italics in each heading) and internal names are set on the
-flow actions; what is below is the body. The HTML that is actually pasted comes
-from `src/build_templates.py`, and `src/pre_send_check.py` checks it first.
+flow actions; what is below is the body. Every draft is validated against
+[`config/store-facts-and-promo-policy.json`](../../config/store-facts-and-promo-policy.json)
+via the automated n8n Pre-Flight QA workflow ([`workflows/ai-email-preflight-qa.n8n.json`](../../workflows/ai-email-preflight-qa.n8n.json))
+before scheduling.
 
 Every email must keep the footer that Klaviyo injects — the physical address
 and the one-click unsubscribe are not optional, and removing them breaks both
@@ -14,8 +16,8 @@ Merge tags use Klaviyo syntax. A greeting is written
 `Ciao{% if first_name %} {{ first_name }}{% endif %},` so that a profile with
 no first name reads "Ciao, ..." rather than "Ciao , ...". The first version used
 `{{ first_name|default:'' }}`: it avoids printing the raw tag, but leaves the
-stray space and comma. `src/pre_send_check.py` now refuses any merge tag whose
-fallback is empty.
+stray space and comma. The Pre-Flight QA gate blocks any merge tag whose
+fallback is empty or produces a broken greeting.
 
 ---
 

@@ -11,9 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify n8n workflow JSON, store policy JSON, and required docs
+      - name: Verify n8n workflow JSONs, Slack blocker formatting, store policy JSON, and docs
         run: |
-          python3 -c "import json; w=json.load(open('workflows/ai-email-preflight-qa.n8n.json')); p=json.load(open('config/store-facts-and-promo-policy.json')); assert len(w['nodes'])==8 and 'discount_policy' in p"
+          python3 - <<'PY'
+          import json
+          w = json.load(open('workflows/ai-email-preflight-qa.n8n.json'))
+          err = json.load(open('workflows/error-notifier.n8n.json'))
+          p = json.load(open('config/store-facts-and-promo-policy.json'))
+          assert len(w['nodes']) == 7 and len(err['nodes']) == 2 and 'discount_policy' in p
+          blocked = [n for n in w['nodes'] if 'BLOCKED' in n['name']][0]
+          assert 'b.category' in blocked['parameters']['text'] and 'b.fix' in blocked['parameters']['text']
+          PY
           test -f prompts/email-policy-qa-prompt.md
           test -f docs/vip-margin-protection-rules.md
           test -f docs/sop-pre-send-qa-checklist.md

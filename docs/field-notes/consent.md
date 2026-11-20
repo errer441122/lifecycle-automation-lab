@@ -1,7 +1,7 @@
 # Consent and suppression
 
-How this project collects, records and honours marketing consent, and why the
-sync script is deliberately unable to grant it.
+How this project collects, records and honours marketing consent, and why automated
+CRM/ESP sync workflows are deliberately unable to grant it.
 
 > Not legal advice. This documents how one small project is configured; a real
 > deployment needs its own review.
@@ -112,15 +112,14 @@ Per the demonstrability requirement, each consent record carries:
 | `consent_source` | `signup_form_double_optin` | Which mechanism, provable |
 | `consent_timestamp` | `2026-05-18T09:12:00Z` | When, in UTC |
 
-This is the schema `src/sync_klaviyo.py` reads. Anything whose status is not
+This is the consent schema enforced before any ESP sync or profile update. Anything whose status is not
 exactly `opted_in` is suppressed, including a profile with **no record at
 all** — absence is treated as `unknown` and suppressed, never as permission.
 An `opted_in` record with no source, or no valid timestamp on or before the
 reference date, is suppressed too, as `opted_in_without_proof`: Art. 7(1) asks
 the shop to show the consent, and one it cannot show does not count. Source
-and timestamp are copied onto the Klaviyo profile, and the sync report counts
-eligible profiles by source, so a sign-up path that skips the confirmation
-(Shopify's checkout checkbox) is visible in numbers.
+and timestamp are stored on the Klaviyo profile so any sign-up path that skips confirmation
+(such as Shopify's native checkout checkbox) is immediately visible in audits.
 
 ## Withdrawal
 
@@ -132,39 +131,20 @@ Withdrawal must be as easy as giving consent (Art. 7(3)):
 - The address is suppressed, not deleted, so a later import cannot silently
   resurrect it — a deletion request under Art. 17 is handled separately
 
-## Why the sync script cannot grant consent
+## Why automated CRM syncs cannot grant consent
 
-A Klaviyo bulk profile import writes profile data. It does **not** subscribe
-anyone to email marketing — that requires a separate subscription call, which
-this project never makes from a script.
+A Klaviyo profile import writes profile attributes (`lifecycle_stage`, `cx_promo_hold`, etc.).
+It does **not** subscribe anyone to email marketing — that requires a separate subscription call,
+which CRM automation workflows never execute on behalf of unconfirmed contacts.
 
-This separation is intentional and is the point of the whole design: consent
-enters the system through exactly one door, the double opt-in form. The sync
-script's only relationship to consent is that it **refuses to act** on anyone
-who has not passed through that door. It cannot open it.
+This separation is intentional and is the core governance guardrail: consent
+enters the system through exactly one door, the confirmed double opt-in form. Any
+downstream CRM sync **refuses to act** on profiles missing verifiable consent proof
+(`consent_status = opted_in`, non-empty `consent_source`, valid `consent_timestamp`).
 
-Concretely, in `build_profiles()`:
-
-```python
-record = consent.get(email, {})
-status = record.get("status", "unknown")
-if status != ELIGIBLE_CONSENT:
-    suppressed[status] += 1
-    continue
-given = consent_date(record.get("timestamp", ""))
-if not record.get("source") or given is None or given > as_of:
-    suppressed["opted_in_without_proof"] += 1
-    continue
-```
-
-The gate runs before the lifecycle stage is even computed, and there is no
-override — the test suite asserts that the highest-value customer in the file
-is still excluded when they have opted out.
-
-## Boundary the code enforces
+## Operational boundaries enforced
 
 - No purchased, scraped, rented or scanned-at-an-event lists
 - No email address is ever invented or guessed
-- The example data uses `example.com`, reserved by RFC 2606 and unable to
-  receive mail, so a misconfigured run cannot reach a real person
-- `--live` is opt-in; the default run opens no socket
+- Example test records use `example.com` (RFC 2606) so misconfigured tests cannot reach real people
+- Consent suppression runs before lifecycle segmentation with zero VIP overrides — even the highest-spend customer is excluded if opted out

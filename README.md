@@ -2,9 +2,11 @@
 
 An operational playbook and visual **n8n + AI Pre-Flight QA** workflow for **Klaviyo, HubSpot, and Shopify** teams — built directly from real platform failure modes discovered during hands-on DNS, Double Opt-In, and lifecycle flow execution.
 
-**[Explore the interactive showcase & field notes](https://errer441122.github.io/lifecycle-automation-lab/)** · **[Download n8n AI Pre-Flight QA blueprint](workflows/ai-email-preflight-qa.n8n.json)**
+**[Explore the interactive showcase & field notes](https://errer441122.github.io/lifecycle-automation-lab/)** · **[Download n8n QA blueprint](workflows/ai-email-preflight-qa.n8n.json)** · **[Error Notifier](workflows/error-notifier.n8n.json)**
 
 [![The showcase page: a win-back draft that the pre-send gate blocks, with its five blockers](assets/page.png)](https://errer441122.github.io/lifecycle-automation-lab/)
+
+> **Live Testing & Scope:** DNS authentication (`send.negozio-online.org` on Cloudflare), Double Opt-In consent flows, Abandoned Cart, and Win-Back flows were built and fired **live** on a real Klaviyo Free + Shopify Dev Store setup (documented in `docs/field-notes/` with zero fabricated conversion rates). The 7-node n8n AI Pre-Flight QA gate + standalone Error Workflow audits campaign drafts against `config/store-facts-and-promo-policy.json` and outputs itemized fix lists to Slack `#crm-qa`.
 
 ---
 
@@ -27,10 +29,13 @@ These are not theoretical checklist items — every rule in this repository come
 flowchart LR
     F["1. Submit Email Draft + Target Segment"] --> P["2. Load Store Facts & Promo Policy JSON"]
     P --> AI["3. AI Pre-Flight QA (Liquid/HubL + UTMs + Policy + VIP Check)"]
-    AI --> G{"4. Zero Blockers?"}
-    G -- "PASS" --> OK["5. Slack #crm-qa: Approved to Schedule"]
-    G -- "FAIL" --> NO["6. Slack #crm-qa: BLOCKED + Exact Fix List"]
+    AI --> PS["4. Parse QA Result (Safe Defaults)"]
+    PS --> G{"5. Zero Blockers?"}
+    G -- "PASS" --> OK["6. Slack #crm-qa: Approved to Schedule"]
+    G -- "FAIL" --> NO["7. Slack #crm-qa: BLOCKED + Itemized Fix List"]
 ```
+
+*Global safety net:* link [`workflows/error-notifier.n8n.json`](workflows/error-notifier.n8n.json) under **Settings → Error Workflow** in n8n so any API failure alerts `#martech-alerts`.
 
 ### What the QA Gate Checks Before Launch
 - **Personalization & Syntax:** Missing or empty fallbacks in both **Klaviyo Liquid** (`{{ first_name }}`) and **HubSpot HubL** (`{{ contact.firstname }}`).
@@ -45,7 +50,8 @@ flowchart LR
 
 | Path | Content |
 | --- | --- |
-| `workflows/ai-email-preflight-qa.n8n.json` | 1-click importable 8-node n8n Pre-Flight QA & Slack approval workflow |
+| `workflows/ai-email-preflight-qa.n8n.json` | 1-click importable 7-node n8n Pre-Flight QA & itemized Slack approval workflow |
+| `workflows/error-notifier.n8n.json` | Standalone 2-node Error Workflow routing execution failures to `#martech-alerts` |
 | `config/store-facts-and-promo-policy.json` | Store truth table (returns, shipping SLA, promo rules, VIP exclusions, GA4 UTMs) |
 | `prompts/email-policy-qa-prompt.md` | Structured AI QA prompt (`temperature = 0.0`) & real before/after example |
 | `docs/vip-margin-protection-rules.md` | Full-price vs. discount eligibility decision matrix for Klaviyo & HubSpot |

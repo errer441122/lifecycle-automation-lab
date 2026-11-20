@@ -135,9 +135,9 @@ documented because the reasoning is the transferable part, not the numbers.
 | Spam complaint | Suppress immediately; investigate which flow and step sent it |
 
 Suppression means suppressed, not deleted: a deleted address can be silently
-re-imported by the next sync, and the person has to unsubscribe twice. The
-sync script in this repo cannot cause that, because it never subscribes
-anyone — see [`consent.md`](consent.md).
+re-imported by the next sync, and the person has to unsubscribe twice. Profile
+attribute syncs in this governance model cannot cause that, because they never
+subscribe anyone — see [`consent.md`](consent.md).
 
 ## What to verify before the first real send
 

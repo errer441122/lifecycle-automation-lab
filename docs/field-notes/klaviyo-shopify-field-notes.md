@@ -10,7 +10,7 @@
 | | |
 | --- | --- |
 | Store | Shopify development store, 8 products (specialty coffee), 3 seeded orders |
-| Store currency | USD — the store sits on a United States market. Prices read as `$` in every screenshot; switch the market to Italy/EUR in Settings → Markets and re-create the orders if that matters for the write-up |
+| Store currency | USD — the development store uses a United States market, so prices appear as `$` in screenshots |
 | ESP | Klaviyo, free plan, connected to the store since 2026-08-27 |
 | Sending domain | `send.negozio-online.org` — **Active**, NS delegation live, DKIM published, DMARC `p=none` |
 | List | *Newsletter (double opt-in)* (`WZDGDT`), double opt-in on, unsubscribe global |
@@ -22,8 +22,9 @@
 
 All three were created as draft orders marked paid, so they all carry today's
 date. Shopify cannot backdate an order from the admin, so only `New` and
-`Repeat` can be produced this way — `At risk`, `Dormant` and `Churned` need
-either real elapsed time or the `--as-of` flag. Addresses are `example.com`
+`Repeat` can be produced this way — `At risk`, `Dormant` and `Churned` require
+either real elapsed time or updating the `lifecycle_stage` profile property
+against a pinned reference date during testing. Addresses are `example.com`
 (RFC 2606), so the order-confirmation emails Shopify sent could not reach a
 real inbox.
 
@@ -56,9 +57,9 @@ event fires, a real segment updates, a real email arrives, and the consent
 gate holds. It does not demonstrate performance, and any reading of it as
 performance is a misreading.
 
-## Sync
+## Sync & Win-Back Trigger Verification
 
-From `reports/sync_report.json`:
+To test the Win-Back flow end-to-end without waiting 91 real calendar days, a one-off local recency test (not part of the repository) evaluated the three seeded Shopify orders against a consent gate and a pinned reference date before pushing `lifecycle_stage` to Klaviyo:
 
 | | Count |
 | --- | --- |
@@ -68,38 +69,40 @@ From `reports/sync_report.json`:
 | Suppressed — `unknown` | 2 |
 
 The two suppressed customers were created in the Shopify admin with the
-marketing checkbox left unticked, so the gate holds them back and they never
+marketing checkbox left unticked, so the consent gate holds them back and they never
 reach the ESP — which is the whole point of the gate, and the cheapest proof
 that it works. The one eligible customer is the subscriber: consent from the
 double opt-in form on 29 August, and a real order (#1004) on 30 August.
 
-**The reference date is the only thing that changes the answer.** Same three
-customers, same consent file, same unmodified rules:
+**The reference date is the only thing that changes the lifecycle stage.** Same three
+customers, same consent record, same unmodified recency bands:
 
-| `--as-of` | Stage assigned |
+| Reference date | Stage assigned |
 | --- | --- |
 | today (30 Aug 2026) | `New` — 1 order, 0 days ago |
-| `2026-12-15` | `At risk` — 107 days ago, inside the 91–180 band |
+| `2026-12-15` (pinned test date) | `At risk` — 107 days ago, inside the 91–180 band |
 
 `At risk` requires 91+ days since the last order, so the win-back flow could
-not otherwise be exercised before December. Pinning the reference date is the
-same device any cohort analysis uses, and it is disclosed here rather than
-quietly baked in: nothing about the order was altered, only the date the
-recency is measured from.
+not otherwise be exercised before December. Updating `lifecycle_stage = "At risk"`
+on the consenting test profile using a pinned reference date is disclosed here
+explicitly rather than quietly baked in: nothing about the order itself was
+altered, only the reference date recency was measured from.
 
 **It ran, and the whole chain held.** 31 August:
 
 ```
-12:55:00  sync --as-of 2026-12-15 --live  ->  lifecycle_stage = "At risk"
-13:07:37  segment "At risk (lifecycle_stage)"  ->  1 profile
+12:55:00  Profile property update (ref date 2026-12-15) ->  lifecycle_stage = "At risk"
+13:07:37  Segment "At risk (lifecycle_stage)"           ->  1 profile
 13:11:49  3.1 "E passato un po. Il tuo caffe ti aspetta"  delivered  flow WiNBzn
 13:15:27  3.1 opened
 ```
 
-Roughly twelve minutes from a property written by a Python script to a segment
-membership, four more to a delivery, and four more to an open. This is the bridge the whole
-repo is built around: the lifecycle model lives in code, not in the ESP, and
-the ESP reads its output as an ordinary profile property.
+Roughly twelve minutes from updating the `lifecycle_stage` profile property in
+Klaviyo to segment membership, four more to delivery, and four more to an open.
+This demonstrates the operational CRM pattern end-to-end: lifecycle status is
+written cleanly as an ordinary ESP profile property (from a CRM sync or n8n
+automation) and Klaviyo segments react automatically without touching email
+consent flags.
 
 Two things worth noticing in those timings. The segment re-indexed in about
 twelve minutes, not the hour this project had budgeted for after watching it
@@ -171,10 +174,10 @@ cart cannot show both. The condition is re-evaluated before every send, so any
 This run demonstrates the send. Reviewing the exit condition's design is fair;
 reading it as verified behaviour is not.
 
-Without a pinned date the win-back cannot trigger until roughly December: it triggers on entry
+Without a pinned test date the win-back cannot trigger until roughly December: it triggers on entry
 to `At risk`, which needs 91+ days since the last order, and the seeded orders
-are days old. `--as-of` exercises the model against a stated reference date,
-which is a disclosure, not a substitute for elapsed time.
+are days old. Pinning a stated reference date tests the segment & flow trigger mechanics,
+which is an explicit test disclosure, not a substitute for real elapsed time.
 
 ## Authentication
 
@@ -250,7 +253,7 @@ have mentioned it.
 
 **What changed as a result:** "domain configured" is not a state worth
 recording. The states that matter are Verified *and* Active, and both are now
-in [`../docs/deliverability.md`](../docs/deliverability.md).
+in [`deliverability.md`](deliverability.md).
 
 ### Consent arrived on a list that nothing reads
 
@@ -313,11 +316,11 @@ Two claims survived every read-through because they are well written:
 The second is the more interesting error: it is not a typo, it is a claim that
 is incoherent with the mechanism sending it.
 
-**What changed as a result:** `STORE_FACTS` in
-[`../src/build_templates.py`](../src/build_templates.py) records what the
-storefront actually backs, and a test fails if any duration in the copy is not
-in it. `TORNA15` was created in Shopify so the offer is real, and the copy now
-states the terms the discount has.
+**What changed as a result:** [`config/store-facts-and-promo-policy.json`](../../config/store-facts-and-promo-policy.json)
+records what the storefront actually backs, and the automated n8n Pre-Flight QA workflow
+([`workflows/ai-email-preflight-qa.n8n.json`](../../workflows/ai-email-preflight-qa.n8n.json))
+blocks any draft promising an unsupported delivery SLA or rolling expiry on a static code.
+`TORNA15` was created in Shopify so the offer is real, and the copy now states the exact terms.
 
 ### Smart Sending ate the cart email, and only one screen says so
 
@@ -457,12 +460,12 @@ on the record that people actually look at.
 Now two properties, because they answer different questions:
 
 ```
-lifecycle_computed_at = "2026-08-31"   when the script ran
+lifecycle_computed_at = "2026-08-31"   when the profile property was updated
 lifecycle_as_of       = "2026-12-15"   what the recency was measured from
 ```
 
-A test in [`../tests/test_sync_klaviyo.py`](../tests/test_sync_klaviyo.py)
-fails if they are ever collapsed back into one. A disclosure that lives only in
+Keeping these two fields separate ensures anyone inspecting the CRM profile directly
+sees both when the update ran and which reference date was used. A disclosure that lives only in
 the write-up is not a disclosure.
 
 ### Smaller ones, without the write-up
@@ -473,7 +476,8 @@ the write-up is not a disclosure.
   messages are Draft sends nothing and looks fine.
 - Klaviyo serves a flow message's template on `GET /api/templates/{id}` and
   answers `404` to `PATCH` on the same id; `PATCH /api/flow-messages/{id}` is
-  `405`. Content goes in by hand. `--verify` exists because of this.
+  `405`. Flow email content must be updated in the Klaviyo editor and verified
+  through Pre-Send QA before turning the message Live.
 - A flow is not retroactive. Subscribing before activating produces a
   subscriber and no email, which reads exactly like a broken flow.
 
@@ -491,7 +495,7 @@ Shopify entirely and let the form be the only writer. This is a correctness
 fix, not an optimisation, and it comes before any test.
 
 **Then, the 4h first-touch delay.** It is the one decision in
-[`../docs/flows.md`](../docs/flows.md) with the weakest justification: 4 hours
+[`flows.md`](flows.md) with the weakest justification: 4 hours
 was chosen to catch the same browsing session, and 1 hour is just as defensible.
 It is also the cheapest to test, since it changes one number and needs no new
 content.

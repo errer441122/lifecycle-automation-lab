@@ -20,7 +20,7 @@
       "name": "Load Store Facts & Promo Policy Truth Table",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [420, 280],
+      "position": [400, 280],
       "parameters": {
         "assignments": {
           "assignments": [
@@ -39,7 +39,7 @@
       "name": "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [680, 280],
+      "position": [660, 280],
       "continueOnFail": true,
       "parameters": {
         "method": "POST",
@@ -50,80 +50,104 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'You are a CRM & Marketing Automation Pre-Flight QA auditor. Audit the email draft against technical QA rules AND the store policy truth table. Check: (1) Klaviyo Liquid / HubSpot HubL merge tags with missing or empty fallbacks, (2) commercial links missing UTMs or breaking lowercase GA4 naming, (3) mobile subject >50 chars or redundant preheader, (4) missing unsubscribe tag, (5) unsupported claims vs store facts (e.g., shipping SLA not published, rolling expiry promised on static code), (6) promotional discount detected without required VIP/Recent-Buyer/CX-Hold exclusions on the target segment. Return strictly JSON: status (PASS | FAIL), has_discount_offer (bool), blockers (array of {category, issue, fix}), warnings (array of {category, issue, fix}).' }, { role: 'user', content: JSON.stringify({ draft: $('Form / Webhook: Submit Campaign Draft').item.json.body, policy: $json }) } ] }) }}"
       },
-      "notes": "Temperature 0.0 for deterministic rule checking + JSON output."
+      "notes": "Temperature 0.0 for deterministic rule checking + JSON output. Supports OpenAI or Google Gemini 2.5 Flash."
     },
     {
       "id": "4",
+      "name": "Parse AI QA Audit Result (Safe Defaults)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [920, 280],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "q1",
+              "name": "status",
+              "value": "={{ (() => { try { const raw = ($json.choices?.[0]?.message?.content || $json.candidates?.[0]?.content?.parts?.[0]?.text || '{}').replace(/```json|```/g, '').trim(); return JSON.parse(raw).status || 'FAIL'; } catch { return 'FAIL'; } })() }}",
+              "type": "string"
+            },
+            {
+              "id": "q2",
+              "name": "has_discount_offer",
+              "value": "={{ (() => { try { const raw = ($json.choices?.[0]?.message?.content || $json.candidates?.[0]?.content?.parts?.[0]?.text || '{}').replace(/```json|```/g, '').trim(); return Boolean(JSON.parse(raw).has_discount_offer); } catch { return false; } })() }}",
+              "type": "boolean"
+            },
+            {
+              "id": "q3",
+              "name": "blockers",
+              "value": "={{ (() => { try { const raw = ($json.choices?.[0]?.message?.content || $json.candidates?.[0]?.content?.parts?.[0]?.text || '{}').replace(/```json|```/g, '').trim(); const b = JSON.parse(raw).blockers; return Array.isArray(b) ? b : []; } catch { return [{ category: 'qa_engine_error', issue: 'AI QA output could not be parsed cleanly', fix: 'Re-run Pre-Flight QA or check API credentials before scheduling.' }]; } })() }}",
+              "type": "array"
+            },
+            {
+              "id": "q4",
+              "name": "warnings",
+              "value": "={{ (() => { try { const raw = ($json.choices?.[0]?.message?.content || $json.candidates?.[0]?.content?.parts?.[0]?.text || '{}').replace(/```json|```/g, '').trim(); const w = JSON.parse(raw).warnings; return Array.isArray(w) ? w : []; } catch { return []; } })() }}",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "notes": "Parses JSON once so downstream Slack messages print every blocker and fix cleanly without repeated JSON.parse calls."
+    },
+    {
+      "id": "5",
       "name": "Guard: Zero Blockers (PASS)?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [940, 280],
+      "position": [1160, 280],
       "parameters": {
         "conditions": {
           "combinator": "and",
           "conditions": [
             {
-              "leftValue": "={{ JSON.parse($json.choices?.[0]?.message?.content || '{}').status }}",
+              "leftValue": "={{ $json.status }}",
               "rightValue": "PASS",
               "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ ($json.blockers || []).length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "equals" }
             }
           ]
         }
       }
     },
     {
-      "id": "5",
+      "id": "6",
       "name": "Slack: PASS — Approved to Schedule (#crm-qa)",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [1200, 180],
+      "position": [1440, 180],
       "parameters": {
         "channel": "#crm-qa",
-        "text": "=:white_check_mark: *Pre-Flight QA PASSED* (`{{ $('Form / Webhook: Submit Campaign Draft').item.json.body.esp }}`)\n*Subject:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.subject }}\n*Segment:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.target_segment_name }}\nReady to schedule after live seed-inbox check."
-      }
-    },
-    {
-      "id": "6",
-      "name": "Slack: BLOCKED — Fix Before Send (#crm-qa)",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.2,
-      "position": [1200, 380],
-      "parameters": {
-        "channel": "#crm-qa",
-        "text": "=:octagonal_sign: *Pre-Flight QA BLOCKED* (`{{ $('Form / Webhook: Submit Campaign Draft').item.json.body.esp }}`)\n*Subject:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.subject }}\n*Blockers found:* {{ JSON.parse($('AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)').item.json.choices?.[0]?.message?.content || '{}').blockers?.length || 1 }}\nReview fix list before scheduling."
+        "text": "=:white_check_mark: *Pre-Flight QA PASSED* (`{{ $('Form / Webhook: Submit Campaign Draft').item.json.body.esp }}`)\n*Subject:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.subject }}\n*Segment:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.target_segment_name }}\n*Exclusions verified:* {{ ($('Form / Webhook: Submit Campaign Draft').item.json.body.excluded_segments || []).join(', ') || 'None (non-promo email)' }}\nReady to schedule after live seed-inbox check."
       }
     },
     {
       "id": "7",
-      "name": "Error Trigger: Failure Alert",
-      "type": "n8n-nodes-base.errorTrigger",
-      "typeVersion": 1,
-      "position": [160, 520],
-      "parameters": {}
-    },
-    {
-      "id": "8",
-      "name": "Slack: Alert #martech-alerts",
+      "name": "Slack: BLOCKED — Fix Before Send (#crm-qa)",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [420, 520],
+      "position": [1440, 380],
       "parameters": {
-        "channel": "#martech-alerts",
-        "text": "=:warning: *Email Pre-Flight QA workflow error* at `{{ $json.execution.lastNodeExecuted }}`: {{ $json.execution.error.message }}"
+        "channel": "#crm-qa",
+        "text": "=:octagonal_sign: *Pre-Flight QA BLOCKED* (`{{ $('Form / Webhook: Submit Campaign Draft').item.json.body.esp }}`)\n*Subject:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.subject }}\n*Segment:* {{ $('Form / Webhook: Submit Campaign Draft').item.json.body.target_segment_name }}\n*Blockers found ({{ ($json.blockers || []).length }}):*\n{{ ($json.blockers || []).map(b => '• *' + b.category + '*: ' + b.issue + ' → _Fix:_ ' + b.fix).join('\\n') }}"
       }
     }
   ],
   "connections": {
     "Form / Webhook: Submit Campaign Draft": { "main": [[{ "node": "Load Store Facts & Promo Policy Truth Table", "type": "main", "index": 0 }]] },
     "Load Store Facts & Promo Policy Truth Table": { "main": [[{ "node": "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)", "type": "main", "index": 0 }]] },
-    "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)": { "main": [[{ "node": "Guard: Zero Blockers (PASS)?", "type": "main", "index": 0 }]] },
+    "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)": { "main": [[{ "node": "Parse AI QA Audit Result (Safe Defaults)", "type": "main", "index": 0 }]] },
+    "Parse AI QA Audit Result (Safe Defaults)": { "main": [[{ "node": "Guard: Zero Blockers (PASS)?", "type": "main", "index": 0 }]] },
     "Guard: Zero Blockers (PASS)?": {
       "main": [
         [{ "node": "Slack: PASS — Approved to Schedule (#crm-qa)", "type": "main", "index": 0 }],
         [{ "node": "Slack: BLOCKED — Fix Before Send (#crm-qa)", "type": "main", "index": 0 }]
       ]
-    },
-    "Error Trigger: Failure Alert": { "main": [[{ "node": "Slack: Alert #martech-alerts", "type": "main", "index": 0 }]] }
+    }
   },
   "active": false,
   "settings": { "executionOrder": "v1" }
