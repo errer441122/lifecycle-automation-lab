@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify n8n workflow JSONs, Slack blocker formatting, store policy JSON, and docs
+      - name: Verify n8n workflow JSONs, Code node parser, Slack v2.2 itemized blockers, policy JSON, and docs
         run: |
           python3 - <<'PY'
           import json
@@ -19,8 +19,14 @@ jobs:
           err = json.load(open('workflows/error-notifier.n8n.json'))
           p = json.load(open('config/store-facts-and-promo-policy.json'))
           assert len(w['nodes']) == 7 and len(err['nodes']) == 2 and 'discount_policy' in p
+          assert '$vars' not in json.dumps(w)
+          assert any(n['type'] == 'n8n-nodes-base.code' for n in w['nodes']), "AI parser must be a real Code node"
           blocked = [n for n in w['nodes'] if 'BLOCKED' in n['name']][0]
           assert 'b.category' in blocked['parameters']['text'] and 'b.fix' in blocked['parameters']['text']
+          for wf in (w, err):
+              for n in wf['nodes']:
+                  if n['type'] == 'n8n-nodes-base.slack':
+                      assert n['parameters'].get('select') == 'channel' and 'channelId' in n['parameters']
           PY
           test -f prompts/email-policy-qa-prompt.md
           test -f docs/vip-margin-protection-rules.md

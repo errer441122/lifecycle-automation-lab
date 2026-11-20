@@ -6,7 +6,10 @@
       "name": "Error Trigger: Workflow Failure",
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
-      "position": [180, 260],
+      "position": [
+        180,
+        260
+      ],
       "parameters": {},
       "notes": "Link this standalone workflow under Settings -> Error Workflow inside ai-email-preflight-qa.n8n.json."
     },
@@ -15,16 +18,39 @@
       "name": "Slack: Alert #martech-alerts on Failure",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [440, 260],
+      "position": [
+        440,
+        260
+      ],
       "parameters": {
-        "channel": "#martech-alerts",
-        "text": "=:warning: *Email Pre-Flight QA Failed:* `{{ $json.workflow.name }}`\n*Node:* `{{ $json.execution.lastNodeExecuted }}`\n*Error:* {{ $json.execution.error.message }}\n*Execution URL:* {{ $json.execution.url }}"
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#martech-alerts",
+          "mode": "name"
+        },
+        "text": "=:warning: *Email Pre-Flight QA Failed:* `{{ $json.workflow.name }}`\n*Node:* `{{ $json.execution.lastNodeExecuted }}`\n*Error:* {{ $json.execution.error.message }}\n*Execution URL:* {{ $json.execution.url }}",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post"
       }
     }
   ],
   "connections": {
-    "Error Trigger: Workflow Failure": { "main": [[{ "node": "Slack: Alert #martech-alerts on Failure", "type": "main", "index": 0 }]] }
+    "Error Trigger: Workflow Failure": {
+      "main": [
+        [
+          {
+            "node": "Slack: Alert #martech-alerts on Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "active": false,
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }
