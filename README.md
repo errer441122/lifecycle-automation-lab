@@ -4,6 +4,8 @@ An operational playbook and visual **n8n + AI Pre-Flight QA** workflow for **Kla
 
 **[Explore the interactive showcase & field notes](https://errer441122.github.io/lifecycle-automation-lab/)** · **[Download n8n AI Pre-Flight QA blueprint](workflows/ai-email-preflight-qa.n8n.json)**
 
+[![The showcase page: a win-back draft that the pre-send gate blocks, with its five blockers](assets/page.png)](https://errer441122.github.io/lifecycle-automation-lab/)
+
 ---
 
 ## 4 Real Platform Failure Modes Caught Hands-On

@@ -4,466 +4,635 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>CRM Governance &amp; AI Pre-Send QA &mdash; Interactive Walkthrough</title>
-<meta name="description" content="Interactive Pre-Send Email QA simulator, real Klaviyo/Shopify/Cloudflare DNS field findings, VIP Margin Protection Matrix, and visual n8n workflow.">
+<title>CRM Pre-Send QA: live showcase</title>
+<meta name="description" content="An n8n pre-send gate that checks email drafts against store policy and VIP margin rules, built from Klaviyo, Shopify and DNS failures found while running live flows.">
+<link rel="preload" href="fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
-@font-face { font-family: "Geist"; src: url("fonts/geist-sans-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Geist"; src: url("fonts/geist-sans-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
-@font-face { font-family: "Geist"; src: url("fonts/geist-sans-700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Archivo"; src: url("fonts/archivo-latin-wdth-normal.woff2") format("woff2"); font-weight: 100 900; font-stretch: 62% 125%; font-display: swap; }
 @font-face { font-family: "Geist Mono"; src: url("fonts/geist-mono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 
 :root {
   color-scheme: light;
-  --bg: #f5f7f5; --card: #ffffff; --sub: #f8faf8; --ink: #111613; --ink2: #46504a; --muted: #6c756f;
-  --line: #dde3de; --accent: #0f6b4a; --accent-ink: #ffffff; --accent-soft: #e8f5ee;
-  --ok: #0f6b4a; --ok-bg: #e8f5ee; --ok-bd: #a7e3c5;
-  --warn: #a15c00; --warn-bg: #fff8e6; --warn-bd: #f7d78c;
-  --bad: #b42318; --bad-bg: #fef2f2; --bad-bd: #fecaca;
-  --slack-bg: #181c20; --slack-ink: #f8fafc; --slack-muted: #94a3b8;
+  --page: #f6f5f7; --panel: #fdfcfd; --sunk: #ecebef;
+  --ink: #1a171d; --ink-2: #3b3641; --muted: #605a67;
+  --line: #dbd6de; --line-soft: #e9e6ec;
+  --accent: #b5175a; --accent-ink: #fff6fa; --accent-soft: #f9e5ed; --accent-line: #e7a2bf;
+  --pass: #1d7a4a; --pass-soft: #e2f2e9; --warn: #9a5b06; --warn-soft: #f8ecd8;
+  --term: #1d1b21; --term-ink: #e9e5ee; --term-dim: #9d96a6;
+  --r: 4px;
+  --sans: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg: #0c100e; --card: #131916; --sub: #18201c; --ink: #edf2ef; --ink2: #b8c2bc; --muted: #86918a;
-    --line: #25302a; --accent: #4dd09d; --accent-ink: #07130e; --accent-soft: #13281f;
-    --ok: #4dd09d; --ok-bg: #11291f; --ok-bd: #1d4d38;
-    --warn: #fbbf24; --warn-bg: #2c210b; --warn-bd: #5c4212;
-    --bad: #f87171; --bad-bg: #2f1417; --bad-bd: #632227;
-    --slack-bg: #0e1215; --slack-ink: #f8fafc; --slack-muted: #94a3b8;
+    --page: #131115; --panel: #1b181e; --sunk: #242027;
+    --ink: #f5f2f6; --ink-2: #d6d0da; --muted: #a59ead;
+    --line: #332e37; --line-soft: #2a262e;
+    --accent: #f37aa6; --accent-ink: #2a0616; --accent-soft: rgb(243 122 166 / .13); --accent-line: rgb(243 122 166 / .45);
+    --pass: #5fd08f; --pass-soft: rgb(95 208 143 / .12); --warn: #f0b44c; --warn-soft: rgb(240 180 76 / .12);
+    --term: #0d0c0f; --term-ink: #e9e5ee; --term-dim: #8f889a;
   }
 }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15.5px/1.6 "Geist", system-ui, -apple-system, sans-serif; }
-a { color: var(--accent); text-underline-offset: 3px; }
-code { font-family: "Geist Mono", ui-monospace, monospace; font-size: 0.86em; background: var(--sub); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
-.wrap { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
 
-header.nav { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
-header.nav .wrap { display: flex; align-items: center; gap: 18px; min-height: 58px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
-.brand { font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: -0.02em; font-size: 15.5px; }
-.nav-links { display: flex; gap: 14px; font-size: 13.5px; margin-left: auto; flex-wrap: wrap; }
-.nav-links a { color: var(--ink2); text-decoration: none; font-weight: 600; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 17px/1.6 var(--sans); font-stretch: 100%; }
+a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { color: var(--accent); }
+code { font-family: var(--mono); font-size: .82em; background: var(--sunk); padding: 1px 5px; border-radius: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
+h1, h2, h3 { margin: 0; }
+.cond { font-stretch: 72%; font-weight: 780; letter-spacing: -0.01em; }
+h2 { font-stretch: 72%; font-weight: 760; font-size: clamp(34px, 4vw, 54px); line-height: .98; letter-spacing: -0.01em; }
+.sub2 { color: var(--muted); max-width: 60ch; margin: 14px 0 0; }
+
+/* nav */
+.nav { border-bottom: 2px solid var(--ink); }
+.nav .wrap { display: flex; align-items: center; gap: 28px; height: 62px; }
+.brand { font-stretch: 72%; font-weight: 800; font-size: 21px; text-decoration: none; letter-spacing: .005em; white-space: nowrap; }
+.brand span { color: var(--accent); }
+.nav-links { display: flex; gap: 24px; margin-left: auto; font-size: 15px; white-space: nowrap; }
+.nav-links a { text-decoration: none; color: var(--ink-2); }
 .nav-links a:hover { color: var(--accent); }
 
-.hero { padding: 44px 0 26px; }
-.kicker { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0 0 10px; }
-h1 { font-size: clamp(28px, 4vw, 42px); line-height: 1.09; letter-spacing: -0.03em; margin: 0 0 12px; max-width: 26ch; }
-.lead { font-size: 17px; color: var(--ink2); max-width: 74ch; margin: 0 0 20px; }
-.cta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
-.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; text-decoration: none; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
-.btn.ghost { background: transparent; color: var(--accent); }
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; padding-top: 64px; padding-bottom: 72px; align-items: center; }
+.eyebrow { font: 13px var(--mono); color: var(--accent); margin: 0 0 16px; }
+h1 { font-stretch: 70%; font-weight: 800; font-size: clamp(48px, 5.8vw, 76px); line-height: .92; letter-spacing: -0.012em; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 42ch; margin: 24px 0 32px; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-flex; align-items: center; height: 50px; padding: 0 22px; border-radius: var(--r); font: 650 16px var(--sans); text-decoration: none; white-space: nowrap; background: var(--accent); color: var(--accent-ink); border: 2px solid var(--accent); transition: transform .2s cubic-bezier(.16,1,.3,1), box-shadow .2s; }
+.btn:hover { color: var(--accent-ink); box-shadow: 4px 4px 0 var(--ink); transform: translate(-2px, -2px); }
+.btn:active { transform: translate(0, 0); box-shadow: none; }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn.ghost:hover { color: var(--ink); }
+.hero-card { margin: 0; border: 2px solid var(--ink); border-radius: var(--r); background: var(--panel); box-shadow: 12px 12px 0 var(--accent-soft); }
+.hero-card .mail { border: 0; border-radius: 0; }
+.stamp { display: flex; align-items: baseline; gap: 12px; padding: 14px 18px; border-top: 2px solid var(--ink); background: var(--accent-soft); font: 13px var(--mono); color: var(--ink-2); }
+.stamp b { font: 800 26px/1 var(--sans); font-stretch: 70%; color: var(--accent); }
 
-.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
-.cmp { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
-.cmp.before { border-left: 4px solid var(--bad); }
-.cmp.after { border-left: 4px solid var(--ok); }
-.cmp h2 { font-size: 13.5px; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 8px; }
-.cmp.before h2 { color: var(--bad); }
-.cmp.after h2 { color: var(--ok); }
-.cmp ul { margin: 0; padding-left: 18px; font-size: 14.5px; color: var(--ink2); display: grid; gap: 5px; }
+/* QA simulator */
+section.band { padding-top: 104px; }
+.drafts { display: flex; flex-wrap: wrap; gap: 0; margin-top: 34px; border-bottom: 2px solid var(--ink); }
+.tab { font: 600 16px var(--sans); color: var(--muted); background: none; border: 0; border-bottom: 4px solid transparent; margin-bottom: -2px; padding: 12px 18px 12px 0; margin-right: 22px; cursor: pointer; text-align: left; }
+.tab small { display: block; font: 12px var(--mono); }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.qa { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; margin-top: 30px; align-items: start; }
+.qa h3 { font-stretch: 72%; font-weight: 750; font-size: 24px; margin-bottom: 12px; }
+.mail { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.mail-head { padding: 16px 18px; border-bottom: 1px solid var(--line-soft); font-size: 14px; display: grid; gap: 6px; }
+.mail-head .row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+.mail-head .k { color: var(--muted); }
+.subj { font-weight: 650; overflow-wrap: anywhere; }
+.subj .over { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--accent); }
+.subj .cut { display: inline-block; width: 2px; height: 1.05em; background: var(--accent); vertical-align: -2px; margin: 0 2px; }
+.count { font: 12px var(--mono); color: var(--muted); }
+.count.bad { color: var(--accent); }
+.mail-body { padding: 18px 20px 22px; font-size: 16px; line-height: 1.55; }
+.mail-body p { margin: 0 0 12px; }
+.mark { background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); padding: 0 2px; }
+.mark sup { font: 10.5px var(--mono); color: var(--accent); margin-left: 2px; }
+.ok { box-shadow: inset 0 -2px 0 var(--pass); padding: 0 2px; }
+.cta { display: inline-block; margin: 6px 0 10px; padding: 11px 20px; border-radius: 3px; background: var(--ink); color: var(--page); font-weight: 650; font-size: 15px; }
+.url { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.aud { display: flex; flex-wrap: wrap; gap: 6px 8px; padding: 14px 18px; border-top: 1px solid var(--line-soft); font-size: 13.5px; }
+.aud b { font-weight: 600; margin-right: 4px; }
+.pill { font: 12px var(--mono); border-radius: 999px; padding: 2px 10px; background: var(--sunk); }
+.pill.missing { background: var(--accent-soft); color: var(--accent); }
+.pill.on { background: var(--pass-soft); color: var(--pass); }
 
-section.block { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 26px 28px; margin: 22px 0; }
-section.block h2 { font-size: 22px; letter-spacing: -0.02em; margin: 0 0 6px; }
-.subhead { color: var(--ink2); margin: 0 0 18px; font-size: 15px; max-width: 78ch; }
+.verdict { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 2px solid var(--ink); }
+.verdict b { font-stretch: 70%; font-weight: 800; font-size: 46px; line-height: 1; letter-spacing: 0; }
+.verdict.fail b { color: var(--accent); }
+.verdict.pass b { color: var(--pass); }
+.verdict span { font: 13px var(--mono); color: var(--muted); }
+.issues { list-style: none; margin: 0; padding: 0; }
+.issues li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 2px 10px; padding: 14px 0; border-bottom: 1px solid var(--line-soft); animation: in .4s cubic-bezier(.16,1,.3,1) both; }
+.issues .n { font: 12px/22px var(--mono); width: 22px; height: 22px; border-radius: 50%; text-align: center; background: var(--accent); color: var(--accent-ink); }
+.issues .w .n { background: var(--warn); color: var(--panel); }
+.issues .cat { font: 12px var(--mono); color: var(--muted); }
+.issues .cat b { font-weight: 400; color: var(--accent); }
+.issues .w .cat b { color: var(--warn); }
+.issues p { grid-column: 2; margin: 2px 0 0; font-size: 15.5px; overflow-wrap: anywhere; }
+.issues .fix { color: var(--muted); font-size: 14.5px; }
+.clean { padding: 16px 0; color: var(--ink-2); }
+@keyframes in { from { opacity: 0; transform: translateY(6px); } }
+.slack { margin-top: 20px; border-left: 4px solid var(--ink); padding: 4px 0 4px 16px; font-size: 15px; }
+.slack .ch { font: 12px var(--mono); color: var(--muted); margin-bottom: 4px; }
+.slack p { margin: 0 0 3px; overflow-wrap: anywhere; }
+.small { font-size: 13.5px; color: var(--muted); margin: 14px 0 0; }
 
-/* Scenario Picker */
-.scenarios { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; margin-bottom: 20px; }
-.sc-btn { text-align: left; font: inherit; background: var(--sub); border: 2px solid var(--line); border-radius: 12px; padding: 13px 15px; cursor: pointer; color: var(--ink); transition: all .15s; }
-.sc-btn:hover { border-color: var(--accent); }
-.sc-btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 2px 10px rgba(15,107,74,.12); }
-.pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
-.sc-btn .pill { margin-bottom: 6px; }
-.pill.ok { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-bd); }
-.pill.warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-bd); }
-.pill.bad { background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-bd); }
-.sc-btn b { display: block; font-size: 14.5px; line-height: 1.25; }
-.sc-btn span { display: block; font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+/* findings */
+.cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; margin-top: 36px; background: var(--ink); border: 2px solid var(--ink); border-radius: var(--r); overflow: hidden; }
+.case { background: var(--panel); padding: 26px 28px 28px; display: flex; flex-direction: column; gap: 12px; }
+.case h3 { font-stretch: 74%; font-weight: 760; font-size: 28px; line-height: 1.02; }
+.case p { margin: 0; color: var(--ink-2); font-size: 15.5px; }
+.case .rule { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: 15px; }
+.case .rule b { color: var(--accent); font-weight: 650; }
+.term { background: var(--term); color: var(--term-ink); border-radius: 3px; padding: 14px 16px; font: 12.5px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.term .d { color: var(--term-dim); }
+.term .hl { color: #ff9cc2; }
+.thumb { padding: 0; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; contain: paint; cursor: zoom-in; background: var(--sunk); }
+.thumb img { display: block; width: 100%; height: 150px; object-fit: cover; object-position: 50% 30%; transition: transform .4s cubic-bezier(.16,1,.3,1); }
+.case.tint { background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--panel); }
+.vs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vs div { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 10px 12px; font-size: 14.5px; }
+.vs small { display: block; font: 11.5px var(--mono); color: var(--muted); margin-bottom: 4px; }
+.vs s { text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
 
-/* Split Preview: Mobile Email vs Slack Audit */
-.qa-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
-.mock { border-radius: 14px; border: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; }
-.mock-head { padding: 10px 15px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: var(--sub); }
-.mock-head .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 7px; }
-.mock-body { padding: 16px; background: var(--card); flex: 1; display: flex; flex-direction: column; gap: 12px; }
+/* run timeline */
+.run { margin-top: 44px; }
+.rail { position: relative; height: 2px; background: var(--line); margin: 64px 8px 0; }
+.ev { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); }
+.ev.last { background: var(--accent); }
+.ev.first time { left: 0; transform: none; }
+.ev.last time { left: auto; right: 0; transform: none; }
+.ev time { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font: 13px var(--mono); white-space: nowrap; color: var(--ink); }
+.gap { position: absolute; top: 14px; transform: translateX(-50%); font: 12px var(--mono); color: var(--accent); white-space: nowrap; }
+.evs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-top: 52px; }
+.evs div { border-top: 2px solid var(--ink); padding-top: 12px; }
+.evs b { display: block; font-stretch: 74%; font-weight: 750; font-size: 21px; line-height: 1.1; }
+.evs p { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+.run .small { max-width: 76ch; }
 
-.inbox-meta { background: var(--sub); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; font-size: 13px; display: grid; gap: 5px; }
-.inbox-row { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.inbox-row span { color: var(--muted); font-size: 12px; }
-.subj-box { font-weight: 700; font-size: 14.5px; line-height: 1.35; padding-top: 3px; border-top: 1px solid var(--line); }
-.cut { background: var(--bad-bg); color: var(--bad); text-decoration: line-through; padding: 0 3px; border-radius: 3px; }
+/* margin rules */
+.ruler { margin-top: 40px; }
+.band-row { display: grid; grid-template-columns: 3.5fr 19fr 22.5fr 46fr 9fr; gap: 3px; }
+.zone { height: 64px; border-radius: 3px; background: var(--sunk); position: relative; transform-origin: left; animation: grow .8s cubic-bezier(.16,1,.3,1) both; }
+.zone.yes { background: var(--accent); }
+.zone.sunset { background: repeating-linear-gradient(-45deg, var(--line) 0 5px, transparent 5px 10px); border: 1px solid var(--line); }
+@keyframes grow { from { transform: scaleX(0); } }
+.zone:nth-child(2) { animation-delay: .06s; } .zone:nth-child(3) { animation-delay: .12s; } .zone:nth-child(4) { animation-delay: .18s; } .zone:nth-child(5) { animation-delay: .24s; }
+.days { display: grid; grid-template-columns: 3.5fr 19fr 22.5fr 46fr 9fr; gap: 3px; font: 12px var(--mono); color: var(--muted); margin-top: 8px; }
+.labels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; margin-top: 26px; }
+.labels div { font-size: 15px; color: var(--ink-2); }
+.labels b { display: block; font-stretch: 76%; font-weight: 750; font-size: 19px; color: var(--ink); }
+.labels .y b { color: var(--accent); }
+.never { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 32px; padding: 24px 0 0; border-top: 2px solid var(--ink); }
+.never h3 { font-stretch: 74%; font-weight: 760; font-size: 28px; line-height: 1.05; }
+.never ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.never li { font-size: 16px; }
+.never li b { font-weight: 650; }
+.seg-def { margin: 18px 0 0; font: 13px/1.6 var(--mono); background: var(--sunk); padding: 12px 14px; border-radius: 3px; white-space: pre-wrap; }
 
-.email-canvas { border: 1px solid var(--line); border-radius: 10px; padding: 15px 16px; background: var(--sub); font-size: 14px; line-height: 1.6; display: grid; gap: 10px; }
-.mark-bad { background: var(--bad-bg); color: var(--bad); border-bottom: 2px solid var(--bad); padding: 1px 4px; border-radius: 3px; font-weight: 600; }
-.mark-ok { background: var(--ok-bg); color: var(--ok); padding: 1px 4px; border-radius: 3px; font-weight: 600; }
-.fake-cta { display: inline-block; padding: 8px 14px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 13px; width: fit-content; }
-.url-pill { font-family: "Geist Mono", monospace; font-size: 11.5px; word-break: break-all; padding: 6px 9px; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--ink2); }
-.url-pill.bad { border-color: var(--bad-bd); background: var(--bad-bg); color: var(--bad); }
-.url-pill.ok { border-color: var(--ok-bd); background: var(--ok-bg); color: var(--ok); }
+/* gate */
+.gate { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; margin-top: 38px; align-items: start; }
+.checks { list-style: none; margin: 0; padding: 0; counter-reset: c; }
+.checks li { counter-increment: c; display: grid; grid-template-columns: 40px 1fr; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+.checks li::before { content: counter(c, decimal-leading-zero); font: 13px var(--mono); color: var(--accent); padding-top: 3px; }
+.checks b { font-weight: 650; display: block; }
+.checks span { color: var(--muted); font-size: 15px; }
+.graphbox { border: 2px solid var(--ink); border-radius: var(--r); background: var(--panel); overflow-x: auto; }
+.canvas { position: relative; min-width: 640px; }
+.canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.edge { fill: none; stroke: var(--muted); stroke-width: 1.5; opacity: .6; }
+.elabel { font: 11px var(--mono); fill: var(--muted); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; }
+.node { position: absolute; width: 104px; padding: 7px 9px; border: 1.5px solid var(--ink); border-radius: 3px; background: var(--panel); font-size: 12px; line-height: 1.25; font-weight: 600; }
+.node .k { display: block; font: 400 10.5px var(--mono); color: var(--muted); margin-bottom: 2px; }
+.node.pass { border-color: var(--pass); }
+.node.fail { border-color: var(--accent); }
+.node.err { border-style: dashed; border-color: var(--line); color: var(--muted); }
+.graph-msg { padding: 36px 18px; text-align: center; color: var(--muted); }
 
-.aud-box { border-top: 1px solid var(--line); padding-top: 10px; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.aud-box strong { color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .04em; margin-right: 4px; }
+/* files */
+.files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; margin-top: 30px; border-top: 2px solid var(--ink); }
+.files a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 16px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
+.files a:hover { color: inherit; }
+.files a:hover .p { color: var(--accent); }
+.files .p { font: 13px var(--mono); overflow-wrap: anywhere; }
+.files .d { grid-column: 1; color: var(--muted); font-size: 15px; }
+.files .go { grid-row: span 2; align-self: center; font: 13px var(--mono); color: var(--accent); }
+.honest { margin-top: 30px; font-size: 15px; color: var(--ink-2); max-width: 78ch; padding: 16px 18px; background: var(--sunk); border-radius: var(--r); }
 
-/* Slack Audit Panel */
-.slack-panel { background: var(--slack-bg); color: var(--slack-ink); padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 12px; font-size: 13.5px; }
-.verdict { border-radius: 10px; padding: 11px 14px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13.5px; }
-.verdict.fail { background: rgba(248,113,113,.15); border: 1px solid rgba(248,113,113,.45); color: #fca5a5; }
-.verdict.pass { background: rgba(77,208,157,.14); border: 1px solid rgba(77,208,157,.45); color: #6ee7b7; }
-.chk-list { display: grid; gap: 8px; }
-.chk { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); border-radius: 9px; padding: 9px 11px; display: grid; gap: 3px; }
-.chk-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
-.chk-top strong { color: #f8fafc; }
-.chk p { margin: 0; font-size: 12.5px; color: var(--slack-muted); line-height: 1.4; }
-.chk p b { color: #e2e8f0; }
+/* lightbox */
+dialog { border: 0; padding: 0; background: transparent; max-width: min(1500px, 94vw); }
+dialog::backdrop { background: rgb(12 10 14 / .82); }
+dialog img { display: block; max-width: 100%; max-height: 86vh; border-radius: 3px; }
+dialog button { position: absolute; top: 10px; right: 10px; font: 600 14px var(--sans); border: 0; border-radius: 3px; padding: 8px 12px; background: var(--panel); color: var(--ink); cursor: pointer; }
 
-/* Field Findings Cards */
-.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
-.fail-card { background: var(--sub); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
-.fail-card h3 { margin: 0; font-size: 16px; line-height: 1.3; }
-.fail-card p { margin: 0; font-size: 14px; color: var(--ink2); }
-.rule-strip { background: var(--ok-bg); border: 1px solid var(--ok-bd); color: var(--ok); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin-top: auto; }
-.rule-strip strong { color: var(--ok); }
+footer { margin-top: 110px; border-top: 2px solid var(--ink); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; padding-top: 26px; padding-bottom: 44px; font-size: 15px; color: var(--muted); }
+footer .who { color: var(--ink); font-stretch: 74%; font-weight: 800; font-size: 19px; margin-right: auto; }
+footer a { color: var(--ink-2); text-decoration: none; }
+footer a:hover { color: var(--accent); }
 
-/* Table */
-.scroll { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
-th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--line); }
-thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
-
-/* Screenshots Gallery + Lightbox */
-.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.shots figure { margin: 0; background: var(--sub); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: zoom-in; transition: border-color .15s; }
-.shots figure:hover { border-color: var(--accent); }
-.shots img { width: 100%; height: 195px; object-fit: cover; object-position: top; display: block; border-bottom: 1px solid var(--line); }
-.shots figcaption { font-size: 13px; color: var(--ink2); padding: 10px 13px; }
-.shots figcaption small { display: block; color: var(--accent); font-weight: 600; margin-top: 3px; font-size: 11.5px; }
-
-.modal { position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50; cursor: zoom-out; }
-.modal.open { display: flex; }
-.modal img { max-width: 96vw; max-height: 88vh; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,.5); background: #fff; }
-
-footer { border-top: 1px solid var(--line); padding: 22px 0 40px; color: var(--muted); font-size: 13.5px; }
-@media (max-width: 900px) { .qa-grid { grid-template-columns: 1fr; } }
-@media (max-width: 600px) { .wrap { padding: 0 16px; } section.block { padding: 18px 16px; } }
+@media (max-width: 1020px) {
+  .hero, .qa, .gate { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .nav-links .proj { display: none; }
+  .labels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .wrap { padding-left: 18px; padding-right: 18px; }
+  .hero { padding-top: 40px; }
+  .cases, .files, .never, .evs { grid-template-columns: minmax(0, 1fr); }
+  .rail { margin-top: 56px; }
+  .ev time { font-size: 11px; }
+  .ev:nth-child(odd) time { bottom: auto; top: 22px; }
+  .gap { display: none; }
+  .labels { grid-template-columns: 1fr; gap: 12px; }
+  section.band { padding-top: 76px; }
+  .vs { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation: none !important; }
+}
 </style>
 </head>
 <body>
 <header class="nav"><div class="wrap">
-  <a class="brand" href="#top">CRM Governance &amp; AI Pre-Send QA</a>
-  <nav class="nav-links">
-    <a href="https://github.com/errer441122">Portfolio Home</a>
-    <a href="https://errer441122.github.io/ai-visibility-audit-geo/">1. GEO Audit</a>
-    <a href="https://errer441122.github.io/ai-inbound-lead-router/">2. Lead Router</a>
-    <a href="https://errer441122.github.io/ecommerce-cx-analytics/">3. CX Promo Guard</a>
-    <a href="https://github.com/errer441122/lifecycle-automation-lab">GitHub Repo &rarr;</a>
+  <a class="brand" href="#top">CRM <span>pre-send QA</span></a>
+  <nav class="nav-links" aria-label="Projects">
+    <a class="proj" href="https://errer441122.github.io/ai-visibility-audit-geo/">GEO audit</a>
+    <a class="proj" href="https://errer441122.github.io/ai-inbound-lead-router/">Lead router</a>
+    <a class="proj" href="https://errer441122.github.io/ecommerce-cx-analytics/">CX promo guard</a>
+    <a href="https://github.com/errer441122/lifecycle-automation-lab">GitHub repo</a>
   </nav>
 </div></header>
 
-<main class="wrap" id="top">
-  <section class="hero">
-    <p class="kicker">Marketing Automation &middot; Klaviyo / HubSpot Governance &middot; Deliverability</p>
-    <h1>Catch broken templates, consent leaks, and VIP discount waste before hitting Send.</h1>
-    <p class="lead">Built from hands-on Klaviyo, Shopify, and Cloudflare DNS field testing. Test the <strong>Interactive Pre-Send QA Simulator</strong> below to see how an 8-node n8n workflow audits every draft against store policy before scheduling.</p>
-    <div class="cta-row">
-      <a class="btn" href="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/workflows/ai-email-preflight-qa.n8n.json" download="ai-email-preflight-qa.n8n.json">Download n8n QA Blueprint (.json)</a>
-      <a class="btn ghost" href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/sop-pre-send-qa-checklist.md">Read 1-Page Pre-Send SOP</a>
-      <a class="btn ghost" href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/config/store-facts-and-promo-policy.json">View Store Policy Source</a>
-    </div>
-
-    <div class="compare">
-      <div class="cmp before">
-        <h2>Without Pre-Send Governance</h2>
-        <ul>
-          <li>Broken Liquid fallbacks (<code>Ciao ,</code>), cut-off mobile subjects, and unverified delivery claims slip past manual reviews.</li>
-          <li>Blanket <code>-15%</code> / <code>-20%</code> blasts hit VIPs &amp; recent buyers, burning gross margin and triggering support refunds.</li>
-          <li>Hidden platform traps (Smart Sending, Shopify single opt-in bypass, DNS wildcards) silently erode revenue &amp; GDPR compliance.</li>
-        </ul>
+<main id="top">
+  <section class="wrap hero">
+    <div>
+      <p class="eyebrow">Klaviyo + Shopify + n8n</p>
+      <h1>Catch broken emails before they ship.</h1>
+      <p class="lede">An n8n gate checks every draft against store policy, with rules from Klaviyo, Shopify and DNS traps found in live tests.</p>
+      <div class="ctas">
+        <a class="btn" href="#qa">Try the QA gate</a>
+        <a class="btn ghost" id="dl" href="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/workflows/ai-email-preflight-qa.n8n.json" download="ai-email-preflight-qa.n8n.json">Download the workflow</a>
       </div>
-      <div class="cmp after">
-        <h2>With This Playbook + n8n QA Gate</h2>
-        <ul>
-          <li>Every draft is audited against a single <strong>Store Facts &amp; Promo Policy</strong> file before going live.</li>
-          <li>Slack <code>#crm-qa</code> posts a clear <strong>PASS / BLOCKED</strong> checklist with exact line-by-line fixes.</li>
-          <li>Mandatory <strong>VIP Margin Guard</strong> &amp; <strong>Active CX Hold</strong> exclusions protect margin and keep spam complaints <strong>&lt;0.3%</strong>.</li>
-        </ul>
+    </div>
+    <figure class="hero-card" aria-label="Example: a win-back draft the gate blocks">
+      <div class="mail" id="hero-mail"></div>
+      <figcaption class="stamp" id="hero-stamp"></figcaption>
+    </figure>
+  </section>
+
+  <section class="wrap band" id="qa">
+    <h2>Three drafts through the gate</h2>
+    <p class="sub2">The checks and the JSON verdict follow <code>prompts/email-policy-qa-prompt.md</code>; the Slack text comes from the workflow file. The drafts are examples.</p>
+    <div class="drafts" role="tablist" aria-label="Email drafts" id="tabs"></div>
+    <div class="qa" role="tabpanel" id="qa-panel" aria-live="polite">
+      <div><h3>What the subscriber would get</h3><div class="mail" id="mail"></div></div>
+      <div><h3>What the gate returns</h3><div id="result"></div></div>
+    </div>
+  </section>
+
+  <section class="wrap band" id="field">
+    <h2>Four things that broke for real</h2>
+    <p class="sub2">Found while authenticating <code>send.negozio-online.org</code> and running the flows. Logs and screenshots are from <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">the field notes</a>.</p>
+    <div class="cases">
+      <article class="case">
+        <h3>Smart Sending ate the first cart email</h3>
+        <p>A welcome email had gone out under five hours earlier, so Klaviyo skipped email 2.1. No error, no alert: one screen says why.</p>
+        <pre class="term"><span class="d">17:47</span>  Received Email   "Benvenuto in Torrefazione Nord"
+<span class="d">18:45</span>  Checkout Started
+<span class="d">22:45</span>  2.1 due  ->  Delivered 0, Skipped 1
+       <span class="hl">"Skipped: Smart Sending (1)"</span></pre>
+        <button type="button" class="thumb" data-full="assets/flow-abandoned-cart.png" aria-label="Enlarge the Klaviyo abandoned cart flow"><img src="assets/flow-abandoned-cart.png" alt="The live Klaviyo abandoned cart flow: wait 4 hours, email 2.1, wait 20 hours, email 2.2, wait 2 days, email 2.3" loading="lazy" width="1800" height="1067" style="transform:scale(2.4);transform-origin:56% 36%"></button>
+        <p class="rule"><b>Rule:</b> Smart Sending off on abandoned cart, on for newsletters.</p>
+      </article>
+      <article class="case">
+        <h3>Double opt-in did not protect the list</h3>
+        <p>A sign-up through Shopify's newsletter field landed as subscribed 86 milliseconds after the webhook. No confirmation email was ever sent.</p>
+        <pre class="term">consent            <span class="hl">SUBSCRIBED</span>
+method             SHOPIFY / Customer Webhook
+webhook event      <span class="d">15:30:36.569</span>
+consent_timestamp  <span class="d">15:30:36.655</span></pre>
+        <button type="button" class="thumb" data-full="assets/klaviyo-double-optin.png" aria-label="Enlarge the Klaviyo list settings"><img src="assets/klaviyo-double-optin.png" alt="Klaviyo list settings with double opt-in selected" loading="lazy" width="1800" height="810" style="transform:scale(1.9);transform-origin:56% 42%"></button>
+        <p class="rule"><b>Rule:</b> keep consent source and timestamp on every profile (GDPR art. 7(1)) and audit for single opt-in leaks.</p>
+      </article>
+      <article class="case">
+        <h3>A green "Verified" was someone else's wildcard</h3>
+        <p>The first domain was parked on Afternic, whose zone answers every TXT query. Klaviyo asked for <code>_dmarc</code>, the wildcard replied and the check went green.</p>
+        <pre class="term"><span class="d">$</span> nslookup -type=TXT mionegozio.com
+mionegozio.com          text = <span class="hl">"v=spf1 -all"</span>
+<span class="d">$</span> nslookup -type=TXT _dmarc.mionegozio.com
+_dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
+        <button type="button" class="thumb" data-full="assets/dns-auth.png" aria-label="Enlarge the DNS lookups for the real sending domain"><img src="assets/dns-auth.png" alt="nslookup output for send.negozio-online.org: Klaviyo nameservers, DKIM CNAME and DMARC record" loading="lazy" width="1018" height="430"></button>
+        <p class="rule"><b>Rule:</b> verify SPF, DKIM and DMARC in public DNS, never on a dashboard tick.</p>
+      </article>
+      <article class="case tint">
+        <h3>Good copy promised what the store cannot do</h3>
+        <p>Drafts passed a manual read while promising shipping times and a coupon expiry the store does not offer.</p>
+        <div class="vs">
+          <div><small>the draft said</small><s>"spedizione garantita in 48 ore"</s></div>
+          <div><small>store policy says</small><code>published_shipping_sla: null</code></div>
+          <div><small>the draft said</small><s>"valido solo 14 giorni"</s></div>
+          <div><small>store policy says</small><code>supports_per_recipient_expiry: false</code></div>
+        </div>
+        <p class="rule"><b>Rule:</b> every draft goes through the <a href="#qa">pre-send gate</a> against <code>config/store-facts-and-promo-policy.json</code>.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap band" id="run">
+    <p class="eyebrow">31 August 2026, one subscriber</p>
+    <h2>From a Python property to an inbox in 17 minutes</h2>
+    <p class="sub2">The lifecycle stage is computed in code and written to the Klaviyo profile. Klaviyo only reads it, and the win-back flow fires.</p>
+    <div class="run">
+      <div class="rail" aria-hidden="true">
+        <span class="ev first" style="left:0%"><time>12:55:00</time></span>
+        <span class="gap" style="left:30.8%">12m 37s</span>
+        <span class="ev" style="left:61.7%"><time>13:07:37</time></span>
+        <span class="gap" style="left:72%">4m 12s</span>
+        <span class="ev" style="left:82.3%"><time>13:11:49</time></span>
+        <span class="gap" style="left:91.1%">3m 38s</span>
+        <span class="ev last" style="left:100%"><time>13:15:27</time></span>
+      </div>
+      <div class="evs">
+        <div><b>Sync writes the stage</b><p><code>lifecycle_stage = "At risk"</code> on the profile, only because consent was on record.</p></div>
+        <div><b>Segment picks it up</b><p>"At risk (lifecycle_stage)" re-indexes: 1 profile.</p></div>
+        <div><b>Win-back 3.1 delivered</b><p>"E passato un po. Il tuo caffe ti aspetta".</p></div>
+        <div><b>Opened</b><p>One open, on a real client. A count, not a rate.</p></div>
+      </div>
+      <p class="small">The sync ran with the reference date pinned to 15 December, so the August order counted as 107 days old; the field notes disclose it. The segment delay varies between runs and is not a constant.</p>
+    </div>
+  </section>
+
+  <section class="wrap band" id="margin">
+    <h2>Who gets a discount, by days since the last order</h2>
+    <p class="sub2">From <code>docs/vip-margin-protection-rules.md</code>. A blanket discount is mostly paid by customers who would have bought at full price.</p>
+    <div class="ruler">
+      <div class="band-row" aria-hidden="true"><div class="zone"></div><div class="zone"></div><div class="zone yes"></div><div class="zone yes"></div><div class="zone sunset"></div></div>
+      <div class="days" aria-hidden="true"><span>0</span><span>15</span><span>91</span><span>181</span><span>365+</span></div>
+      <div class="labels">
+        <div><b>Recent buyer</b>0-14 days. Post-purchase care, no coupon.</div>
+        <div><b>New buyer</b>15-90 days. A nudge first, offers only after day 90.</div>
+        <div class="y"><b>At risk</b>91-180 days. One win-back offer, <code>TORNA15</code>, once.</div>
+        <div class="y"><b>Dormant</b>181-365 days. One final offer, then sunset.</div>
+        <div><b>Unengaged</b>Over 365 days. Suppressed to protect the sender.</div>
+      </div>
+      <div class="never">
+        <h3>Never, whatever the date</h3>
+        <div>
+          <ul>
+            <li><b>VIP and Champions:</b> 3 or more orders, or the top 20% by spend.</li>
+            <li><b>Full-price repeat buyers:</b> 2 or more orders, never used a coupon.</li>
+            <li><b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/ecommerce-cx-analytics/">CX promo guard</a>.</li>
+          </ul>
+          <pre class="seg-def">Klaviyo segment "Exclusion: Protect Full-Price Margin"
+  Placed Order at least 3 times over all time
+  OR Placed Order at least once in the last 14 days
+  OR cx_promo_hold equals true</pre>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- INTERACTIVE PRE-SEND EMAIL QA SIMULATOR -->
-  <section class="block" id="simulator">
-    <h2>Interactive Simulator: Test 3 Email Drafts Against the AI Pre-Flight QA Gate</h2>
-    <p class="subhead">Switch between the 3 drafts below. On the left is what the customer would receive; on the right is the exact <strong>Slack <code>#crm-qa</code></strong> traffic-light verdict produced by the n8n workflow.</p>
-
-    <div class="scenarios" id="scenarios" role="group" aria-label="Email QA test drafts"></div>
-    <div class="qa-grid" id="qa-grid"></div>
-  </section>
-
-  <!-- 4 REAL FIELD FINDINGS -->
-  <section class="block" id="findings">
-    <h2>4 Real Platform Failure Modes Caught Hands-On (Klaviyo &middot; Shopify &middot; Cloudflare)</h2>
-    <p class="subhead">None of these are textbook theory &mdash; every failure below occurred while authenticating a live sending subdomain (<code>send.negozio-online.org</code>) and firing real Shopify-to-Klaviyo lifecycle flows (<a href="https://github.com/errer441122/lifecycle-automation-lab/tree/main/docs/field-notes">read full field notes</a>).</p>
-
-    <div class="grid-2">
-      <div class="fail-card">
-        <span class="pill bad" style="width:fit-content">Silent Revenue Loss</span>
-        <h3>1. Smart Sending Silently Ate Cart Email #1</h3>
-        <p>A Welcome email went out 5 hours earlier, so Klaviyo skipped the high-intent Abandoned Cart touch with zero visible errors in standard campaign reports.</p>
-        <div class="rule-strip"><strong>Operational Rule:</strong> Turn Smart Sending <b>OFF</b> on Abandoned Cart &amp; Checkout recovery; keep <b>ON</b> only for promotional newsletters.</div>
-      </div>
-
-      <div class="fail-card">
-        <span class="pill bad" style="width:fit-content">GDPR Art. 7(1) Risk</span>
-        <h3>2. Shopify Checkout Checkbox Bypassed Double Opt-In</h3>
-        <p>Enabling Double Opt-In on a Klaviyo list only protects Klaviyo forms &mdash; Shopify's native checkout checkbox subscribed contacts in 86ms with zero confirmation email.</p>
-        <div class="rule-strip"><strong>Operational Rule:</strong> Isolate flow lists, block single-opt-in leaks, and log explicit <code>consent_source</code> + timestamp for every profile.</div>
-      </div>
-
-      <div class="fail-card">
-        <span class="pill warn" style="width:fit-content">Deliverability Trap</span>
-        <h3>3. A Green "Verified" DNS Badge Was a Wildcard</h3>
-        <p>A parked domain answered <code>_dmarc</code> with a wildcard <code>v=spf1 -all</code> and turned Klaviyo's UI green. Even after fixing DNS, a Verified domain still requires manual Activation.</p>
-        <div class="rule-strip"><strong>Operational Rule:</strong> Never trust UI green checkmarks alone &mdash; verify SPF, DKIM, and DMARC in public DNS &amp; raw email headers.</div>
-      </div>
-
-      <div class="fail-card">
-        <span class="pill warn" style="width:fit-content">Copy vs. Policy Mismatch</span>
-        <h3>4. Email Copy Promised What the Store Could Not Deliver</h3>
-        <p>Manual proofreading missed "48h guaranteed shipping" (unpublished SLA) and "valid 14 days" written on a static coupon code, plus a blank Liquid greeting.</p>
-        <div class="rule-strip"><strong>Operational Rule:</strong> Run every draft through the automated n8n Pre-Flight QA gate against <code>store-facts-and-promo-policy.json</code>.</div>
-      </div>
+  <section class="wrap band" id="gate">
+    <h2>The gate itself</h2>
+    <div class="gate">
+      <ol class="checks">
+        <li><div><b>Personalisation fallbacks</b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span></div></li>
+        <li><div><b>GA4 UTMs</b><span>Lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code> on every commercial link.</span></div></li>
+        <li><div><b>Copy against store policy</b><span>No shipping times the checkout does not publish, no expiry on a static code.</span></div></li>
+        <li><div><b>Discount exclusions</b><span>VIPs, recent buyers and active CX holds excluded whenever a discount appears.</span></div></li>
+        <li><div><b>Mobile and deliverability basics</b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span></div></li>
+      </ol>
+      <div class="graphbox"><div class="canvas" id="canvas"><p class="graph-msg">Loading the workflow file...</p></div></div>
     </div>
   </section>
 
-  <!-- VIP MARGIN PROTECTION MATRIX -->
-  <section class="block" id="vip">
-    <h2>VIP Margin Protection Matrix (Who Gets Discounts vs. Who Stays Full-Price)</h2>
-    <p class="subhead">Best customers buy at full price anyway &mdash; sending them blanket coupons destroys gross margin and trains them to wait for sales. Enforce via one reusable exclusion segment (<code>Exclusion &mdash; Protect Full-Price Margin</code>):</p>
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Customer Segment</th><th>Definition</th><th>Auto Discount?</th><th>Recommended CRM Treatment</th></tr></thead>
-        <tbody>
-          <tr><td><strong>VIP / Champions</strong></td><td>&ge;3 lifetime orders OR top 20% spend</td><td><span class="pill bad">NO &mdash; Exclude</span></td><td>Early access to launches, private previews, loyalty perks (zero margin burn)</td></tr>
-          <tr><td><strong>Full-Price Repeat</strong></td><td>&ge;2 orders, 0 past coupons used</td><td><span class="pill bad">NO &mdash; Exclude</span></td><td>Replenishment &amp; cross-sell recommendations at full margin</td></tr>
-          <tr><td><strong>Recent Buyers</strong></td><td>Purchased within the last 14 days</td><td><span class="pill bad">NO &mdash; Cooldown</span></td><td>Post-purchase care &amp; onboarding (prevents buyer remorse &amp; refund tickets)</td></tr>
-          <tr><td><strong>At Risk / Dormant</strong></td><td>Last order 91&ndash;365 days ago</td><td><span class="pill ok">YES &mdash; Controlled</span></td><td>Single win-back offer (<code>TORNA15</code>, once per customer), then stop</td></tr>
-          <tr><td><strong>Unengaged (&gt;365d)</strong></td><td>Zero opens, clicks, or orders in 1 year</td><td><span class="pill warn">NO &mdash; Sunset</span></td><td>Suppress to stay safely below Google/Yahoo <strong>0.3%</strong> spam complaint ceiling</td></tr>
-          <tr><td><strong>Active CX Hold</strong></td><td>Stuck parcel, 1&ndash;2&#9733; review, or open ticket</td><td><span class="pill bad">NO &mdash; Global Hold</span></td><td>Pause all marketing &amp; review emails automatically via <a href="https://errer441122.github.io/ecommerce-cx-analytics/">CX Promo Guard</a></td></tr>
-        </tbody>
-      </table>
+  <section class="wrap band" id="files">
+    <h2>The files</h2>
+    <div class="files">
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go">open</span><span class="d">The 8-node pre-send workflow, ready to import</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/config/store-facts-and-promo-policy.json"><span class="p">config/store-facts-and-promo-policy.json</span><span class="go">open</span><span class="d">The store's truth table the gate reads</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/prompts/email-policy-qa-prompt.md"><span class="p">prompts/email-policy-qa-prompt.md</span><span class="go">open</span><span class="d">Blocker and warning rules, JSON output</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/vip-margin-protection-rules.md"><span class="p">docs/vip-margin-protection-rules.md</span><span class="go">open</span><span class="d">Who gets a discount and who does not</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/sop-pre-send-qa-checklist.md"><span class="p">docs/sop-pre-send-qa-checklist.md</span><span class="go">open</span><span class="d">One-page checklist before any send</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/tree/main/docs/field-notes"><span class="p">docs/field-notes/</span><span class="go">open</span><span class="d">The full Klaviyo, Shopify and DNS notes</span></a>
     </div>
-  </section>
-
-  <!-- REAL KLAVIYO & DNS EVIDENCE -->
-  <section class="block" id="evidence">
-    <h2>Real Hands-On Klaviyo Flow &amp; Cloudflare DNS Evidence</h2>
-    <p class="subhead">Actual canvases and DNS records configured in a live Klaviyo + Shopify + Cloudflare environment (zero fabricated open/revenue numbers). Click any image to enlarge:</p>
-    <div class="shots">
-      <figure data-full="assets/flow-abandoned-cart.png">
-        <img src="assets/flow-abandoned-cart.png" alt="Klaviyo Abandoned Cart flow canvas">
-        <figcaption><strong>Abandoned Cart Flow</strong> &mdash; 4h &rarr; 20h &rarr; 2d cadence with Placed Order exit re-checked before every email.<small>Click to enlarge &rarr;</small></figcaption>
-      </figure>
-      <figure data-full="assets/flow-welcome.png">
-        <img src="assets/flow-welcome.png" alt="Klaviyo Welcome flow canvas">
-        <figcaption><strong>Confirmed Double Opt-In Welcome</strong> &mdash; Triggered strictly after confirmed list consent (GDPR Art. 7(1)).<small>Click to enlarge &rarr;</small></figcaption>
-      </figure>
-      <figure data-full="assets/dns-auth.png">
-        <img src="assets/dns-auth.png" alt="Cloudflare DNS DKIM and DMARC records">
-        <figcaption><strong>Branded Sending Subdomain</strong> &mdash; Authenticated via Cloudflare NS delegation, DKIM, and DMARC.<small>Click to enlarge &rarr;</small></figcaption>
-      </figure>
-    </div>
+    <p class="honest">The Klaviyo account, the flows and the DNS records are real. They run on a Shopify development store with no real customers, which is why no open rates or revenue figures are claimed.</p>
   </section>
 </main>
 
-<div class="modal" id="modal" role="dialog" aria-label="Enlarged screenshot">
-  <img id="modal-img" src="" alt="Enlarged view">
-</div>
+<dialog id="lightbox"><img id="lightbox-img" src="" alt=""><button type="button" id="lightbox-close">Close</button></dialog>
 
 <footer><div class="wrap">
-  <p>Real Klaviyo/Shopify/DNS field notes, VIP Margin Protection Matrix, 1-page Pre-Send SOP, and 8-node n8n QA blueprint &mdash; <a href="https://github.com/errer441122/lifecycle-automation-lab">inspect full repository on GitHub</a>.</p>
+  <span class="who">Riccardo Capanna</span>
+  <a href="https://errer441122.github.io/ai-visibility-audit-geo/">GEO audit</a>
+  <a href="https://errer441122.github.io/ai-inbound-lead-router/">Lead router</a>
+  <a href="https://errer441122.github.io/ecommerce-cx-analytics/">CX promo guard</a>
+  <a href="https://github.com/errer441122">GitHub</a>
+  <a href="https://www.linkedin.com/in/riccardo-capanna-039a43415/">LinkedIn</a>
 </div></footer>
 
 <script>
+const BASE = location.hostname.endsWith("github.io")
+  ? "https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/"
+  : "../";
+
+// Three example drafts. Issues follow the blocker and warning rules of the QA prompt.
 const DRAFTS = [
   {
-    id: "broken",
-    badge: "BLOCKED · 5 Issues",
-    badgeCls: "bad",
-    title: "Broken Win-Back (Real Field-Notes Bug)",
-    subtitle: "Blank 'Ciao ,', fake 48h shipping, static coupon, no UTMs, no VIP exclusions",
-    sender: "Negozio Online <news@send.negozio-online.org>",
-    subjectOk: "Torna a trovarci oggi: un regalo speciale per te ",
-    subjectCut: "con spedizione 48h!",
-    subjectLen: "68 chars (cuts off at 50 on mobile)",
-    audience: [
-      ["Target List", "All Subscribers", "warn"],
-      ["VIP Exclusion", "MISSING", "bad"],
-      ["CX Hold Exclusion", "MISSING", "bad"]
+    tab: "Win-back, first draft", note: "the real field-notes bug",
+    esp: "klaviyo", segment: "All Subscribers",
+    from: "Negozio Online <news@send.negozio-online.org>",
+    subject: "Torna a trovarci oggi: un regalo speciale per te con spedizione 48h!",
+    preview: "",
+    body: [
+      ["mark", "Ciao ,", 1], ["text", " È passato un po' dal tuo ultimo ordine. Torna oggi e approfitta della "], ["mark", "spedizione garantita in 48 ore", 2], ["text", "."],
+      ["br"],
+      ["text", "Usa il codice TORNA15 ("], ["mark", "valido solo 14 giorni", 3], ["text", ") per il 15% di sconto."],
     ],
-    bodyHtml: `
-      <div><span class="mark-bad">Ciao ,</span> <small style="color:var(--bad)">(&larr; empty first_name fallback!)</small></div>
-      <div>È passato un po' dal tuo ultimo ordine. Torna oggi e approfitta della <span class="mark-bad">spedizione garantita in 48 ore</span>!</div>
-      <div>Usa il codice <code>TORNA15</code> (<span class="mark-bad">valido solo 14 giorni</span>) al checkout per il 15% di sconto.</div>
-    `,
-    ctaLabel: "Scopri la collezione",
-    url: "https://negozio-online.org/collezione",
-    urlOk: false,
-    pass: false,
-    verdictTitle: "BLOCKED — DO NOT SCHEDULE (5 Blockers Found)",
-    verdictBadge: "5 FAIL · 0 WARN",
-    checks: [
-      ["Personalization Fallback", false, "<code>{{ first_name|default:'' }}</code> renders <b>'Ciao ,'</b>. Fix: wrap in <code>{% if first_name %}</code>."],
-      ["Store Policy & Shipping SLA", false, "Claims <b>'48h guaranteed shipping'</b>, but <code>published_shipping_sla</code> is <code>null</code>. Remove SLA claim."],
-      ["Coupon Mechanics Check", false, "Promises <b>'valid 14 days'</b> on static code <code>TORNA15</code> (no per-recipient expiry). Switch to dynamic code or fix copy."],
-      ["GA4 UTM Taxonomy", false, "CTA link has <b>zero UTMs</b>. Add <code>?utm_source=klaviyo&amp;utm_medium=email&amp;utm_campaign=lifecycle_winback</code>."],
-      ["VIP Margin & CX Hold Guard", false, "15% promo targets <b>All Subscribers</b> without excluding VIPs, 14d Recent Buyers, or Active CX Hold."],
-      ["Mobile Subject Length", false, "68 characters truncates past char 50 on iOS/Android inboxes. Trim to &le;50 chars."]
-    ]
+    cta: "Scopri la collezione", url: ["https://negozio-online.org/collezione", 4],
+    excluded: [["VIP / Champions", false], ["Purchased last 14 days", false], ["Active CX hold", false]],
+    blockers: [
+      ["personalization", "{{ first_name|default:'' }} renders \"Ciao ,\" for profiles without a first name.", "Ciao{% if first_name %} {{ first_name }}{% endif %},"],
+      ["policy_mismatch", "Promises 48-hour shipping, but published_shipping_sla is null.", "Remove the delivery-time claim."],
+      ["policy_mismatch", "Promises a 14-day expiry on the static code TORNA15.", "Use dynamic per-recipient coupons or drop the expiry."],
+      ["utm", "The CTA link has no UTM parameters.", "?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback"],
+      ["vip_margin_guard", "A 15% discount goes to All Subscribers with no VIP, recent-buyer or CX-hold exclusion.", "Exclude the segment Protect Full-Price Margin."],
+    ],
+    warnings: [
+      ["mobile_ux", "The subject is 68 characters; phones cut it near 50.", "Trim it to 50 characters or fewer.", 0],
+      ["preview_text", "The preview text is empty.", "Add one line that the subject does not already say.", 0],
+    ],
   },
   {
-    id: "margin-leak",
-    badge: "BLOCKED · Margin Leak",
-    badgeCls: "warn",
-    title: "Black Friday -20% Missing VIP Exclusions",
-    subtitle: "Copy & UTMs are spotless — but QA blocks margin burn on full-price VIPs",
-    sender: "Negozio Online <news@send.negozio-online.org>",
-    subjectOk: "Black Friday: 20% sulla nuova collezione",
-    subjectCut: "",
-    subjectLen: "40 chars (fits mobile cleanly)",
-    audience: [
-      ["Target List", "Engaged 180d", "ok"],
-      ["VIP / Full-Price Exclusion", "MISSING", "bad"],
-      ["Purchased Last 14d", "MISSING", "bad"]
+    tab: "Black Friday, 20% off", note: "clean copy, margin leak",
+    esp: "klaviyo", segment: "Engaged 180d",
+    from: "Negozio Online <news@send.negozio-online.org>",
+    subject: "Black Friday: 20% sulla nuova collezione",
+    preview: "Solo fino a domenica sera, reso gratuito in 30 giorni.",
+    body: [
+      ["ok", "Ciao Giulia,"], ["text", " solo per questo weekend il 20% di sconto su tutta la selezione stagionale. Il reso resta gratuito entro 30 giorni."],
+      ["br"],
+      ["text", "Usa il codice BF20 al checkout entro domenica sera."],
     ],
-    bodyHtml: `
-      <div><span class="mark-ok">Ciao Giulia,</span></div>
-      <div>Solo per questo weekend, il 20% di sconto su tutta la selezione stagionale. Reso gratuito sempre garantito entro 30 giorni.</div>
-      <div>Usa il codice <code>BF20</code> al checkout entro domenica sera.</div>
-    `,
-    ctaLabel: "Vai alla selezione Black Friday",
-    url: "https://negozio-online.org/black-friday?utm_source=klaviyo&utm_medium=email&utm_campaign=promo_bf_2026",
-    urlOk: true,
-    pass: false,
-    verdictTitle: "BLOCKED — VIP MARGIN & COOLDOWN LEAK",
-    verdictBadge: "1 BLOCKER · 5 PASS",
-    checks: [
-      ["VIP Margin & CX Hold Guard", false, "20% discount campaign is missing <b>Exclusion &mdash; Protect Full-Price Margin</b> (VIPs, Full-Price Repeat, 14d Recent Buyers, Active CX Hold)."],
-      ["Personalization Fallback", true, "Conditional Liquid guard verified — renders cleanly even if first_name is blank."],
-      ["Store Policy & Shipping SLA", true, "30-day free returns matches <code>store-facts-and-promo-policy.json</code>; zero invented shipping SLAs."],
-      ["Coupon Mechanics Check", true, "Fixed calendar deadline ('entro domenica sera') matches static campaign coupon behavior."],
-      ["GA4 UTM Taxonomy", true, "Valid lowercase snake_case GA4 parameters (<code>klaviyo / email / promo_bf_2026</code>)."],
-      ["Mobile Subject Length", true, "40 characters — displays in full without truncation on mobile."]
-    ]
+    cta: "Vai alla selezione Black Friday", url: ["https://negozio-online.org/black-friday?utm_source=klaviyo&utm_medium=email&utm_campaign=promo_bf_2026", 0],
+    excluded: [["VIP / Champions", false], ["Purchased last 14 days", false], ["Active CX hold", false]],
+    blockers: [
+      ["vip_margin_guard", "A 20% discount without the exclusions for VIPs, full-price repeat buyers, recent buyers and active CX holds.", "Add Protect Full-Price Margin and Active CX Hold to the excluded segments."],
+    ],
+    warnings: [],
   },
   {
-    id: "clean",
-    badge: "PASS · Ready to Send",
-    badgeCls: "ok",
-    title: "Approved Win-Back (All 6 Checks Green)",
-    subtitle: "Clean fallback, honest policy copy, GA4 UTMs, and VIP/CX exclusions active",
-    sender: "Negozio Online <news@send.negozio-online.org>",
-    subjectOk: "Un piccolo pensiero per il tuo ritorno",
-    subjectCut: "",
-    subjectLen: "38 chars (fits mobile cleanly)",
-    audience: [
-      ["Target", "At Risk (91–180d)", "ok"],
-      ["Excluded", "Protect Full-Price Margin", "ok"],
-      ["Excluded", "Active CX Hold", "ok"]
+    tab: "Win-back, fixed", note: "ready to schedule",
+    esp: "klaviyo", segment: "At risk (91-180d)",
+    from: "Negozio Online <news@send.negozio-online.org>",
+    subject: "Un piccolo pensiero per il tuo ritorno",
+    preview: "Un codice per il tuo prossimo ordine, una volta sola.",
+    body: [
+      ["ok", "Ciao,"], ["text", " ci farebbe piacere rivederti. Come bentornato puoi usare il codice TORNA15 (una volta per cliente) per il 15% sul prossimo ordine."],
+      ["br"],
+      ["text", "Come sempre hai "], ["ok", "30 giorni di reso gratuito"], ["text", "."],
     ],
-    bodyHtml: `
-      <div><span class="mark-ok">Ciao,</span> <small style="color:var(--ok)">(&larr; clean fallback when first_name is blank)</small></div>
-      <div>Ci farebbe piacere rivederti. Come benvenuto di ritorno puoi usare il codice <code>TORNA15</code> (utilizzabile una volta per cliente) per il 15% sul tuo prossimo ordine.</div>
-      <div>Come sempre, hai <span class="mark-ok">30 giorni di reso gratuito</span>.</div>
-    `,
-    ctaLabel: "Esplora i nuovi arrivi",
-    url: "https://negozio-online.org/collezione?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback",
-    urlOk: true,
-    pass: true,
-    verdictTitle: "PASS — APPROVED FOR SCHEDULING",
-    verdictBadge: "6 / 6 CHECKS PASSED",
-    checks: [
-      ["Personalization Fallback", true, "Conditional Liquid guard present — zero trailing spaces or orphaned commas."],
-      ["Store Policy & Shipping SLA", true, "30-day free returns verified against policy file; zero unsupported shipping promises."],
-      ["Coupon Mechanics Check", true, "Accurately states <code>once_per_customer</code> static rule for <code>TORNA15</code> without fake expiry countdown."],
-      ["GA4 UTM Taxonomy", true, "All links carry <code>utm_source=klaviyo&amp;utm_medium=email&amp;utm_campaign=lifecycle_winback</code>."],
-      ["VIP Margin & CX Hold Guard", true, "Excludes VIP/Champions, Full-Price Repeat, Purchased-14d, Unengaged &gt;365d, and Active CX Hold."],
-      ["Mobile Subject Length", true, "38 characters — crisp and completely visible on mobile inboxes."]
-    ]
-  }
+    cta: "Esplora i nuovi arrivi", url: ["https://negozio-online.org/collezione?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback", 0],
+    excluded: [["Protect Full-Price Margin", true], ["Active CX hold", true]],
+    blockers: [],
+    warnings: [],
+  },
 ];
 
-const scEl = document.getElementById("scenarios");
-const gridEl = document.getElementById("qa-grid");
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const clean = (s) => String(s).replace(/\s*[\u2013\u2014]\s*/g, ": ");
+let WF = null, WF_TEXT = null, current = 0;
 
-function render(idx) {
-  const d = DRAFTS[idx];
-  [...scEl.children].forEach((b, i) => b.setAttribute("aria-pressed", String(i === idx)));
-
-  const audPills = d.audience.map(([k, v, cls]) => `<span class="pill ${cls}">${k}: ${v}</span>`).join("");
-  const checksHtml = d.checks.map(([name, ok, desc]) => `
-    <div class="chk">
-      <div class="chk-top">
-        <strong>${name}</strong>
-        <span class="pill ${ok ? "ok" : "bad"}">${ok ? "PASS" : "BLOCKER"}</span>
-      </div>
-      <p>${desc}</p>
-    </div>
-  `).join("");
-
-  gridEl.innerHTML = `
-    <div class="mock">
-      <div class="mock-head"><span><i class="dot" style="background:var(--accent)"></i>Draft Preview &middot; Mobile Inbox View</span><span>${d.subjectLen}</span></div>
-      <div class="mock-body">
-        <div class="inbox-meta">
-          <div class="inbox-row"><span>From</span><strong>${d.sender.replace(/</g,"&lt;")}</strong></div>
-          <div class="subj-box">${d.subjectOk}${d.subjectCut ? `<span class="cut">${d.subjectCut}</span>` : ""}</div>
-        </div>
-
-        <div class="email-canvas">
-          ${d.bodyHtml}
-          <div class="fake-cta">${d.ctaLabel}</div>
-          <div class="url-pill ${d.urlOk ? "ok" : "bad"}">CTA URL: ${d.url}</div>
-        </div>
-
-        <div class="aud-box">
-          <strong>Audience &amp; Exclusions</strong>
-          ${audPills}
-        </div>
-      </div>
-    </div>
-
-    <div class="mock">
-      <div class="mock-head"><span><i class="dot" style="background:${d.pass ? "var(--ok)" : "var(--bad)"}"></i>Slack &middot; #crm-qa Pre-Flight Verdict</span><span>n8n AI QA Gate</span></div>
-      <div class="slack-panel">
-        <div class="verdict ${d.pass ? "pass" : "fail"}">
-          <span>${d.verdictTitle}</span>
-          <span class="pill ${d.pass ? "ok" : "bad"}">${d.verdictBadge}</span>
-        </div>
-        <div class="chk-list">${checksHtml}</div>
-      </div>
-    </div>
-  `;
-}
-
+const tabsEl = $("#tabs");
 DRAFTS.forEach((d, i) => {
   const b = document.createElement("button");
-  b.type = "button"; b.className = "sc-btn";
-  b.innerHTML = `<span class="pill ${d.badgeCls}">${d.badge}</span><b>${d.title}</b><span>${d.subtitle}</span>`;
-  b.addEventListener("click", () => render(i));
-  scEl.append(b);
-});
-render(0);
-
-// Lightbox for real screenshots
-const modal = document.getElementById("modal");
-const modalImg = document.getElementById("modal-img");
-document.querySelectorAll(".shots figure").forEach(fig => {
-  fig.addEventListener("click", () => {
-    modalImg.src = fig.dataset.full;
-    modal.classList.add("open");
+  b.type = "button"; b.className = "tab"; b.setAttribute("role", "tab"); b.id = "tab-" + i;
+  b.setAttribute("aria-controls", "qa-panel");
+  b.innerHTML = `${esc(d.tab)}<small>${esc(d.note)}</small>`;
+  b.addEventListener("click", () => select(i));
+  b.addEventListener("keydown", (e) => {
+    const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    if (!k) return;
+    e.preventDefault();
+    const n = (i + k + DRAFTS.length) % DRAFTS.length;
+    select(n); tabsEl.children[n].focus();
   });
+  tabsEl.append(b);
 });
-modal.addEventListener("click", () => modal.classList.remove("open"));
-document.addEventListener("keydown", e => { if (e.key === "Escape") modal.classList.remove("open"); });
+
+function subjectHTML(s) {
+  const chars = [...s];
+  if (chars.length <= 50) return esc(s);
+  return esc(chars.slice(0, 50).join("")) + '<span class="cut" aria-hidden="true"></span><span class="over">' + esc(chars.slice(50).join("")) + "</span>";
+}
+
+function mailHTML(d) {
+  const len = [...d.subject].length;
+  const body = d.body.map(([t, text, n]) =>
+    t === "br" ? "</p><p>" : t === "mark" ? `<span class="mark">${esc(text)}<sup>${n}</sup></span>` : t === "ok" ? `<span class="ok">${esc(text)}</span>` : esc(text)).join("");
+  const [url, urlIssue] = d.url;
+  return `
+    <div class="mail-head">
+      <div class="row"><span class="k">From</span><span>${esc(d.from)}</span></div>
+      <div class="row"><span class="k">Subject</span><span class="subj">${subjectHTML(d.subject)}</span></div>
+      <div class="row"><span class="k"></span><span class="count ${len > 50 ? "bad" : ""}">${len} characters${len > 50 ? ", a phone shows about 50" : ""}</span></div>
+      <div class="row"><span class="k">Preview</span><span>${d.preview ? esc(d.preview) : '<span class="count bad">(empty)</span>'}</span></div>
+    </div>
+    <div class="mail-body"><p>${body}</p><span class="cta">${esc(d.cta)}</span><div class="url">${urlIssue ? `<span class="mark">${esc(url)}<sup>${urlIssue}</sup></span>` : esc(url)}</div></div>
+    <div class="aud"><b>Sent to</b><span class="pill">${esc(d.segment)}</span><b style="margin-left:8px">Excluded</b>${d.excluded.map(([n, on]) => `<span class="pill ${on ? "on" : "missing"}">${esc(n)}${on ? "" : ": missing"}</span>`).join("")}</div>`;
+}
+
+function select(i) {
+  current = i;
+  [...tabsEl.children].forEach((b, j) => { b.setAttribute("aria-selected", String(j === i)); b.tabIndex = j === i ? 0 : -1; });
+  $("#qa-panel").setAttribute("aria-labelledby", "tab-" + i);
+  const d = DRAFTS[i];
+  $("#mail").innerHTML = mailHTML(d);
+
+  const pass = d.blockers.length === 0;
+  const items = d.blockers.map(([cat, issue, fix], j) => `<li><span class="n">${j + 1}</span><span class="cat"><b>blocker</b> ${esc(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`)
+    .concat(d.warnings.map(([cat, issue, fix]) => `<li class="w"><span class="n">!</span><span class="cat"><b>warning</b> ${esc(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`));
+  const slackNode = WF && WF.nodes.find((n) => n.type.endsWith("slack") && n.name.includes(pass ? "PASS" : "BLOCKED"));
+  $("#result").innerHTML = `
+    <div class="verdict ${pass ? "pass" : "fail"}"><b>${pass ? "PASS" : "FAIL"}</b><span>${d.blockers.length} blocker${d.blockers.length === 1 ? "" : "s"}, ${d.warnings.length} warning${d.warnings.length === 1 ? "" : "s"}</span></div>
+    ${items.length ? `<ol class="issues">${items.join("")}</ol>` : `<p class="clean">No blockers and no warnings. The discount reaches only At risk customers, with the margin and CX-hold exclusions attached.</p>`}
+    ${slackNode ? `<div class="slack"><div class="ch">${esc(slackNode.parameters.channel)}</div>${slackText(slackNode.parameters.text, d)}</div>` : ""}
+    <p class="small">${pass ? "PASS still means a live seed-inbox check before scheduling." : "Blockers stop the send: the draft goes back with the fix list."}</p>`;
+  $("#result").querySelectorAll(".issues li").forEach((li, j) => (li.style.animationDelay = j * 50 + "ms"));
+}
+
+function slackText(template, d) {
+  const text = template.replace(/^=/, "").replace(/\{\{([\s\S]*?)\}\}/g, (_, x) =>
+    /\.esp\b/.test(x) ? d.esp : /\.subject\b/.test(x) ? d.subject : /target_segment_name/.test(x) ? d.segment : /blockers/.test(x) ? String(d.blockers.length) : "...");
+  return esc(clean(text.replace(/:[a-z_]+:\s*/g, "")))
+    .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .split("\n").map((l) => `<p>${l}</p>`).join("");
+}
+
+// ---- the gate, drawn from the workflow file ----
+const NODE_W = 104;
+function draw() {
+  const el = $("#canvas");
+  const nodes = WF.nodes;
+  const xs = nodes.map((n) => n.position[0]), ys = nodes.map((n) => n.position[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const pad = 20, width = Math.max(el.parentElement.clientWidth, 640);
+  const s = (width - 2 * pad - NODE_W) / (maxX - minX);
+  el.style.width = width + "px";
+  el.style.height = Math.round((maxY - minY) * s + 2 * pad + 66) + "px";
+  const pos = new Map(nodes.map((n) => [n.name, { x: pad + (n.position[0] - minX) * s, y: pad + (n.position[1] - minY) * s }]));
+  el.innerHTML = "";
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg"); svg.setAttribute("aria-hidden", "true"); el.append(svg);
+  for (const [src, c] of Object.entries(WF.connections)) {
+    (c.main || []).forEach((outs, oi) => (outs || []).forEach((t) => {
+      const a = pos.get(src), b = pos.get(t.node);
+      const x1 = a.x + NODE_W, y1 = a.y + 24, x2 = b.x, y2 = b.y + 24, mx = (x1 + x2) / 2;
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("d", `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+      p.setAttribute("class", "edge"); svg.append(p);
+      if (nodes.find((n) => n.name === src).type.endsWith(".if")) {
+        const tx = document.createElementNS(NS, "text");
+        tx.setAttribute("x", x1 + 6); tx.setAttribute("y", y1 + (y2 > y1 ? 16 : -8));
+        tx.setAttribute("class", "elabel"); tx.textContent = oi === 0 ? "pass" : "fail"; svg.append(tx);
+      }
+    }));
+  }
+  for (const n of nodes) {
+    const p = pos.get(n.name), d = document.createElement("div");
+    const t = n.type.split(".").pop();
+    d.className = "node" + (n.name.includes("PASS") ? " pass" : n.name.includes("BLOCKED") ? " fail" : t === "errorTrigger" || n.name.includes("martech") ? " err" : "");
+    d.style.left = p.x + "px"; d.style.top = p.y + "px"; d.title = clean(n.name);
+    const i = n.name.indexOf(": ");
+    const short = clean((i > -1 ? n.name.slice(i + 2) : n.name).replace(/\s*\((JSON|#crm-qa)\)/g, ""));
+    const kind = { httpRequest: "ai call", errorTrigger: "on error", set: "set" }[t] || t;
+    d.innerHTML = `<span class="k">${esc(kind)}</span>${esc(short)}`;
+    el.append(d);
+  }
+}
+
+fetch(BASE + "workflows/ai-email-preflight-qa.n8n.json")
+  .then((r) => (r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status))))
+  .then((text) => { WF_TEXT = text; WF = JSON.parse(text); draw(); select(current); })
+  .catch(() => { $("#canvas").innerHTML = `<p class="graph-msg">The workflow file did not load. <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json">Open it on GitHub</a>.</p>`; });
+
+let rt;
+window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => WF && draw(), 150); });
+
+$("#dl").addEventListener("click", (e) => {
+  if (!WF_TEXT) return;
+  e.preventDefault();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([WF_TEXT], { type: "application/json" }));
+  a.download = "ai-email-preflight-qa.n8n.json";
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// ---- lightbox for the real screenshots ----
+const box = $("#lightbox"), boxImg = $("#lightbox-img");
+document.querySelectorAll("[data-full]").forEach((b) => b.addEventListener("click", () => {
+  boxImg.src = b.dataset.full; boxImg.alt = b.querySelector("img").alt;
+  box.showModal();
+}));
+$("#lightbox-close").addEventListener("click", () => box.close());
+box.addEventListener("click", (e) => { if (e.target === box) box.close(); });
+
+const first = DRAFTS[0];
+$("#hero-mail").innerHTML = mailHTML(first);
+$("#hero-stamp").innerHTML = `<b>FAIL</b>${first.blockers.length} blockers, ${first.warnings.length} warnings`;
+select(0);
 </script>
 </body>
 </html>
