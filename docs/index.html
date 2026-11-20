@@ -118,6 +118,8 @@ section.band { padding-top: 104px; }
 .issues .w .cat b { color: var(--warn); }
 .issues p { grid-column: 2; margin: 2px 0 0; font-size: 15.5px; overflow-wrap: anywhere; }
 .issues .fix { color: var(--muted); font-size: 14.5px; }
+.by { display: inline-block; font: 500 10.5px/1.6 var(--mono); padding: 0 6px; margin-left: 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); vertical-align: 1px; }
+.by.ai { border-color: var(--accent); color: var(--accent); }
 .clean { padding: 16px 0; color: var(--ink-2); }
 @keyframes in { from { opacity: 0; transform: translateY(6px); } }
 .slack { margin-top: 20px; border-left: 4px solid var(--ink); padding: 4px 0 4px 16px; font-size: 15px; }
@@ -179,7 +181,8 @@ section.band { padding-top: 104px; }
 .seg-def { margin: 18px 0 0; font: 13px/1.6 var(--mono); background: var(--sunk); padding: 12px 14px; border-radius: 3px; white-space: pre-wrap; }
 
 /* gate */
-.gate { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; margin-top: 38px; align-items: start; }
+.gate { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; margin-top: 30px; }
+.gate .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
 .checks { list-style: none; margin: 0; padding: 0; counter-reset: c; }
 .checks li { counter-increment: c; display: grid; grid-template-columns: 40px 1fr; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
 .checks li::before { content: counter(c, decimal-leading-zero); font: 13px var(--mono); color: var(--accent); padding-top: 3px; }
@@ -227,7 +230,7 @@ footer a:hover { color: var(--accent); }
 @media (max-width: 720px) {
   .wrap { padding-left: 18px; padding-right: 18px; }
   .hero { padding-top: 40px; }
-  .cases, .files, .never, .evs { grid-template-columns: minmax(0, 1fr); }
+  .cases, .files, .never, .evs, .gate .checks { grid-template-columns: minmax(0, 1fr); }
   .rail { margin-top: 56px; }
   .ev time { font-size: 11px; }
   .ev:nth-child(odd) time { bottom: auto; top: 22px; }
@@ -375,7 +378,8 @@ _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
           <pre class="seg-def">Klaviyo segment "Exclusion: Protect Full-Price Margin"
   Placed Order at least 3 times over all time
   OR Placed Order at least once in the last 14 days
-  OR cx_promo_hold equals true</pre>
+
+Also under "Don't send to": segment "CX hold active"</pre>
         </div>
       </div>
     </div>
@@ -383,13 +387,14 @@ _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
 
   <section class="wrap band" id="gate">
     <h2>The gate itself</h2>
+    <p class="sub2">Code checks what has one right answer. The AI only reads the copy against the store's facts and the exclusions.</p>
     <div class="gate">
       <ol class="checks">
-        <li><div><b>Personalisation fallbacks</b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span></div></li>
-        <li><div><b>GA4 UTMs</b><span>Lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code> on every commercial link.</span></div></li>
-        <li><div><b>Copy against store policy</b><span>No shipping times the checkout does not publish, no expiry on a static code.</span></div></li>
-        <li><div><b>Discount exclusions</b><span>VIPs, recent buyers and active CX holds excluded whenever a discount appears.</span></div></li>
-        <li><div><b>Mobile and deliverability basics</b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span></div></li>
+        <li><div><b>Personalisation fallbacks<span class="by">rule</span></b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span></div></li>
+        <li><div><b>Links and GA4 UTMs<span class="by">rule</span></b><span>https links with lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code>.</span></div></li>
+        <li><div><b>Mobile and deliverability basics<span class="by">rule</span></b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span></div></li>
+        <li><div><b>Copy against store policy<span class="by ai">AI</span></b><span>No shipping times the checkout does not publish, no expiry on a static code.</span></div></li>
+        <li><div><b>Discount exclusions<span class="by ai">AI</span></b><span>VIPs, recent buyers and customers in CX hold active excluded whenever a discount appears.</span></div></li>
       </ol>
       <div class="graphbox"><div class="canvas" id="canvas"><p class="graph-msg">Loading the workflow file...</p></div></div>
     </div>
@@ -398,9 +403,9 @@ _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
   <section class="wrap band" id="files">
     <h2>The files</h2>
     <div class="files">
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go">open</span><span class="d">The 7-node pre-send workflow (+ standalone error-notifier.n8n.json), ready to import</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go">open</span><span class="d">The pre-send workflow and the standalone error-notifier.n8n.json, ready to import</span></a>
       <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/config/store-facts-and-promo-policy.json"><span class="p">config/store-facts-and-promo-policy.json</span><span class="go">open</span><span class="d">The store's truth table the gate reads</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/prompts/email-policy-qa-prompt.md"><span class="p">prompts/email-policy-qa-prompt.md</span><span class="go">open</span><span class="d">Blocker and warning rules, JSON output</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/prompts/email-policy-qa-prompt.md"><span class="p">prompts/email-policy-qa-prompt.md</span><span class="go">open</span><span class="d">What the AI checks, and what the rules check</span></a>
       <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/vip-margin-protection-rules.md"><span class="p">docs/vip-margin-protection-rules.md</span><span class="go">open</span><span class="d">Who gets a discount and who does not</span></a>
       <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/sop-pre-send-qa-checklist.md"><span class="p">docs/sop-pre-send-qa-checklist.md</span><span class="go">open</span><span class="d">One-page checklist before any send</span></a>
       <a href="https://github.com/errer441122/lifecycle-automation-lab/tree/main/docs/field-notes"><span class="p">docs/field-notes/</span><span class="go">open</span><span class="d">The full Klaviyo, Shopify and DNS notes</span></a>
@@ -425,7 +430,9 @@ const BASE = location.hostname.endsWith("github.io")
   ? "https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/"
   : "../";
 
-// Three example drafts. Issues follow the blocker and warning rules of the QA prompt.
+// Three example drafts. Issues follow the fixed rules (Code node) and the AI checks (prompt).
+const RULE_CATS = new Set(["personalization", "links", "utm", "unsubscribe", "mobile_ux", "preview_text", "accessibility"]);
+const by = (cat) => RULE_CATS.has(cat) ? '<span class="by">rule</span>' : '<span class="by ai">AI</span>';
 const DRAFTS = [
   {
     tab: "Win-back, first draft", note: "the real field-notes bug",
@@ -434,17 +441,17 @@ const DRAFTS = [
     subject: "Torna a trovarci oggi: un regalo speciale per te con spedizione 48h!",
     preview: "",
     body: [
-      ["mark", "Ciao ,", 1], ["text", " È passato un po' dal tuo ultimo ordine. Torna oggi e approfitta della "], ["mark", "spedizione garantita in 48 ore", 2], ["text", "."],
+      ["mark", "Ciao ,", 1], ["text", " È passato un po' dal tuo ultimo ordine. Torna oggi e approfitta della "], ["mark", "spedizione garantita in 48 ore", 3], ["text", "."],
       ["br"],
-      ["text", "Usa il codice TORNA15 ("], ["mark", "valido solo 14 giorni", 3], ["text", ") per il 15% di sconto."],
+      ["text", "Usa il codice TORNA15 ("], ["mark", "valido solo 14 giorni", 4], ["text", ") per il 15% di sconto."],
     ],
-    cta: "Scopri la collezione", url: ["https://negozio-online.org/collezione", 4],
+    cta: "Scopri la collezione", url: ["https://negozio-online.org/collezione", 2],
     excluded: [["VIP / Champions", false], ["Purchased last 14 days", false], ["Active CX hold", false]],
     blockers: [
       ["personalization", "{{ first_name|default:'' }} renders \"Ciao ,\" for profiles without a first name.", "Ciao{% if first_name %} {{ first_name }}{% endif %},"],
+      ["utm", "The CTA link has no UTM parameters.", "?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback"],
       ["policy_mismatch", "Promises 48-hour shipping, but published_shipping_sla is null.", "Remove the delivery-time claim."],
       ["policy_mismatch", "Promises a 14-day expiry on the static code TORNA15.", "Use dynamic per-recipient coupons or drop the expiry."],
-      ["utm", "The CTA link has no UTM parameters.", "?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback"],
       ["vip_margin_guard", "A 15% discount goes to All Subscribers with no VIP, recent-buyer or CX-hold exclusion.", "Exclude the segment Protect Full-Price Margin."],
     ],
     warnings: [
@@ -540,8 +547,8 @@ function select(i) {
   $("#mail").innerHTML = mailHTML(d);
 
   const pass = d.blockers.length === 0;
-  const items = d.blockers.map(([cat, issue, fix], j) => `<li><span class="n">${j + 1}</span><span class="cat"><b>blocker</b> ${esc(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`)
-    .concat(d.warnings.map(([cat, issue, fix]) => `<li class="w"><span class="n">!</span><span class="cat"><b>warning</b> ${esc(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`));
+  const items = d.blockers.map(([cat, issue, fix], j) => `<li><span class="n">${j + 1}</span><span class="cat"><b>blocker</b> ${esc(cat)}${by(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`)
+    .concat(d.warnings.map(([cat, issue, fix]) => `<li class="w"><span class="n">!</span><span class="cat"><b>warning</b> ${esc(cat)}${by(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`));
   const slackNode = WF && WF.nodes.find((n) => n.type.endsWith("slack") && n.name.includes(pass ? "PASS" : "BLOCKED"));
   $("#result").innerHTML = `
     <div class="verdict ${pass ? "pass" : "fail"}"><b>${pass ? "PASS" : "FAIL"}</b><span>${d.blockers.length} blocker${d.blockers.length === 1 ? "" : "s"}, ${d.warnings.length} warning${d.warnings.length === 1 ? "" : "s"}</span></div>
@@ -562,7 +569,7 @@ function slackText(template, d) {
     : "...");
   return esc(clean(text.replace(/:[a-z_]+:\s*/g, "")))
     .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
-    .replace(/_([^_]+)_/g, "<em>$1</em>")
+    .replace(/(^|\s)_([^_]+)_(?=\s|$)/g, "$1<em>$2</em>")
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .split("\n").map((l) => `<p>${l}</p>`).join("");
 }
@@ -574,7 +581,7 @@ function draw() {
   const nodes = WF.nodes;
   const xs = nodes.map((n) => n.position[0]), ys = nodes.map((n) => n.position[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const pad = 20, width = Math.max(el.parentElement.clientWidth, 640);
+  const pad = 20, width = Math.max(el.parentElement.clientWidth, 820);
   const s = (width - 2 * pad - NODE_W) / (maxX - minX);
   el.style.width = width + "px";
   el.style.height = Math.round((maxY - minY) * s + 2 * pad + 66) + "px";

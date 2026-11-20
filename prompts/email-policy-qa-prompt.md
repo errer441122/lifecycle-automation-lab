@@ -1,55 +1,54 @@
-# AI Pre-Flight QA & Store Policy Consistency Prompt
+# Pre-Flight QA: Fixed Rules + AI Store Policy Check
 
-This prompt powers Node 3 in [`workflows/ai-email-preflight-qa.n8n.json`](../workflows/ai-email-preflight-qa.n8n.json). It automates both technical ESP checks and a real failure mode discovered during hands-on Klaviyo QA: **well-written email copy that promises things the store cannot deliver** (e.g., *"48-hour shipping"* when checkout publishes no SLA, or *"valid for 14 days"* on a static Shopify coupon code).
+The pre-send gate in [`workflows/ai-email-preflight-qa.n8n.json`](../workflows/ai-email-preflight-qa.n8n.json) splits the work in two:
+
+- **Fixed rules (Code node `Rules: Fixed Checks (No AI)`):** everything with one right answer. Code is exact, free and never changes its mind, so no AI is used for these.
+- **AI (node `AI: Policy Check & VIP Margin Audit (JSON)`):** only the judgment calls, where the copy has to be read: does it promise something the store cannot keep, and does a discount go out without the exclusions? This is the real failure mode found during hands-on Klaviyo QA: **well-written copy that promises things the store cannot deliver** (*"48-hour shipping"* when checkout publishes no SLA, *"valid for 14 days"* on a static Shopify code).
+
+The node `Merge Rule & AI Results (Safe Defaults)` puts both lists together: any blocker means FAIL, and an unreadable AI answer is itself a blocker.
 
 ---
 
-## 1. System Prompt (Temperature = `0.0`, Strict JSON)
+## 1. What the Fixed Rules Check
+
+| Check | Level | Rule |
+| --- | --- | --- |
+| Personalization fallbacks | Blocker | A first-name tag outside `{% if first_name %}...{% endif %}` needs a non-empty fallback (`{{ first_name|default:'' }}` fails) |
+| Links | Blocker | Every link is a full `https://` URL (unsubscribe links and links built from template tags are skipped) |
+| GA4 UTMs | Blocker | Every link carries lowercase `utm_source`, `utm_medium=email` and `utm_campaign` |
+| Unsubscribe | Blocker | `{% unsubscribe %}` (Klaviyo) or `{{ unsubscribe_link }}` (HubSpot) is present |
+| Subject length | Warning | Over 50 characters gets cut on phones |
+| Preview text | Warning | Empty, or the same as the subject |
+| Image alt text | Warning | An `<img>` without a non-empty `alt` |
+
+## 2. AI System Prompt (Temperature = `0.0`, Strict JSON)
 
 ```text
-You are a Marketing Automation & CRM Pre-Flight QA auditor for Klaviyo and HubSpot.
-Compare the submitted email draft (HTML, subject, preheader, target_segment, excluded_segments)
-against the provided `store-facts-and-promo-policy.json`.
-
-Flag a BLOCKER for any of the following:
-1. Personalization tags without a fallback or with an empty fallback
-   (e.g. `{{ first_name }}`, `{{ first_name|default:'' }}`, `{{ contact.firstname }}`).
-2. Commercial links missing `utm_source`, `utm_medium=email`, or `utm_campaign`,
-   or using uppercase/spaces that fragment GA4 reporting.
-3. Dead/empty/`#`/non-HTTPS links, or missing mandatory unsubscribe token
-   (`{% unsubscribe %}` in Klaviyo; `{{ unsubscribe_link }}` in HubSpot).
-4. Copy claims contradicting `store_policies` or `discount_policy`
-   (e.g., promising a delivery SLA when `published_shipping_sla` is null, or
-   promising a rolling expiry window on a static coupon code).
-5. Discount/coupon offer detected in subject or body while `excluded_segments`
-   does not include VIPs, recent buyers (14d), and Active CX Hold.
-
-Flag a WARNING for:
-- Subject line longer than 50 characters (mobile truncation).
-- Empty preview text or preview text duplicating the subject line.
-- Images missing non-empty `alt` text.
-
-Output strictly valid JSON:
-{
-  "status": "PASS" | "FAIL",
-  "has_discount_offer": boolean,
-  "blockers": [{ "category": string, "issue": string, "fix": string }],
-  "warnings": [{ "category": string, "issue": string, "fix": string }]
-}
+You are a CRM pre-send QA auditor. Fixed checks (merge-tag fallbacks, links, UTMs,
+unsubscribe tag, subject length, preview text, alt text) are already done by code:
+do not repeat them. Check only two things against the store policy:
+(1) copy claims the store cannot keep (e.g. a shipping time when published_shipping_sla
+    is none, an expiry window on a static code), category policy_mismatch;
+(2) a discount or coupon offered while excluded_segments lacks the required VIP,
+    recent-buyer and CX-hold exclusions, category vip_margin_guard.
+Return strictly JSON: has_discount_offer (bool), blockers (array of {category, issue, fix}),
+warnings (array of {category, issue, fix}).
 ```
 
 ---
 
-## 2. Concrete Example Caught Before Launch
+## 3. Concrete Example Caught Before Launch
 
 **Draft input:**
-- Subject: *"Spedizione in 48 ore e -15% con codice TORNA15 valido 14 giorni!"* (65 chars)
-- Body: `Ciao {{ first_name|default:'' }}, usa TORNA15 entro 14 giorni...`
-- Excluded segments: `Unsubscribed only`
+- Subject: *"Torna a trovarci oggi: un regalo speciale per te con spedizione 48h!"* (68 chars), no preview text
+- Body: `Ciao {{ first_name|default:'' }}, ... spedizione garantita in 48 ore ... TORNA15 (valido solo 14 giorni)`, CTA link without UTMs
+- Excluded segments: none
 
-**JSON output returned by the QA gate (`status: FAIL`):**
-1. `[BLOCKER · personalization]` `{{ first_name|default:'' }}` renders `"Ciao ,"` for profiles without a first name → replace with `Ciao{% if first_name %} {{ first_name }}{% endif %},`.
-2. `[BLOCKER · policy_mismatch]` Copy promises *"Spedizione in 48 ore"*, but `published_shipping_sla` is `null` → remove delivery-time claim.
-3. `[BLOCKER · policy_mismatch]` Copy promises *"valido 14 giorni"* on static code `TORNA15` (`supports_per_recipient_expiry: false`) → either switch to dynamic per-recipient Klaviyo coupons or remove the 14-day claim.
-4. `[BLOCKER · vip_margin_guard]` 15% discount detected, but `VIP / Champions`, `Purchased Last 14 Days`, and `Active CX Hold` are missing from `excluded_segments`.
-5. `[WARNING · mobile_ux]` Subject is 65 characters — trim to ≤50 characters for mobile inboxes.
+**Verdict (`status: FAIL`), in the order the merge node lists it:**
+1. `[BLOCKER · personalization · rule]` `{{ first_name|default:'' }}` renders `"Ciao ,"` for profiles without a first name → `Ciao{% if first_name %} {{ first_name }}{% endif %},`.
+2. `[BLOCKER · utm · rule]` The CTA link has no UTM parameters → `?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback`.
+3. `[BLOCKER · policy_mismatch · AI]` Promises 48-hour shipping, but `published_shipping_sla` is `null` → remove the delivery-time claim.
+4. `[BLOCKER · policy_mismatch · AI]` Promises a 14-day expiry on the static code `TORNA15` (`supports_per_recipient_expiry: false`) → use dynamic per-recipient coupons or drop the expiry.
+5. `[BLOCKER · vip_margin_guard · AI]` 15% discount to All Subscribers with no VIP, recent-buyer or CX-hold exclusion → exclude `Exclusion — Protect Full-Price Margin` and `CX hold active`.
+6. `[WARNING · mobile_ux · rule]` Subject is 68 characters → trim to 50 or fewer.
+7. `[WARNING · preview_text · rule]` Preview text is empty → add one line the subject does not already say.

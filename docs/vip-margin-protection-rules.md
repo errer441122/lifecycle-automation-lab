@@ -15,11 +15,11 @@ Sending the same blanket discount to the entire database is one of the highest-c
 | **At Risk (91–180 days)** | Last order 91–180 days ago | **YES — Controlled** | Single win-back offer (`TORNA15`, once per customer), then stop |
 | **Dormant (181–365 days)** | Last order 181–365 days ago | **YES — Final Offer** | One last reactivation offer; if unengaged, move to sunset |
 | **Churned / Unengaged (>365 days)** | No open/click/order in 365 days | **NO — Sunset** | Suppress to protect sender reputation (<0.3% spam complaint threshold) |
-| **Active CX Hold** | Stuck parcel, 1–2★ review, or open ticket | **NO — Global Hold** | Pause all marketing & review emails until resolved |
+| **Active CX Hold** | Stuck parcel, 1–2★ review, or open ticket | **NO — Global Hold** | Pause all marketing & review emails until the CX pause end date passes |
 
 ---
 
 ## 2. How to Enforce in Klaviyo & HubSpot (Zero Coding)
 
-- **Klaviyo:** Build a reusable segment named **`Exclusion — Protect Full-Price Margin`** (`Placed Order >= 3 over all time` OR `Placed Order at least once in last 14 days` OR `cx_promo_hold equals true`). Select it under **Don't send to** on every promotional campaign and as a Flow Filter on discount branches.
+- **Klaviyo:** Build a reusable segment named **`Exclusion — Protect Full-Price Margin`** (`Placed Order >= 3 over all time` OR `Placed Order at least once in last 14 days`). Select it under **Don't send to** on every promotional campaign, together with the segment `CX hold active` from the [CX promo guard](https://github.com/errer441122/cx-crm-promo-guard), and rebuild the same conditions as a Flow Filter on discount branches.
 - **HubSpot:** Build an Active Suppression List with the same criteria and attach it to every promotional email send.

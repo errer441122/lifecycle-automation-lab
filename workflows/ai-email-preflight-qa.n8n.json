@@ -20,12 +20,27 @@
       "notes": "Receives campaign draft before launch: esp (klaviyo | hubspot), subject, preheader, html, target_segment_name, excluded_segments."
     },
     {
+      "id": "8",
+      "name": "Rules: Fixed Checks (No AI)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        280
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Fixed checks, no AI: each of these has one right answer, so plain code checks it.\nconst draft = $json.body || {};\nconst subject = String(draft.subject || '');\nconst preview = String(draft.preheader || '');\nconst html = String(draft.html || '');\nconst blockers = [];\nconst warnings = [];\nconst flag = (list, category, issue, fix) => list.push({ category, issue, fix });\n\n// 1. First-name tags need a real fallback, unless they sit inside {% if first_name %} ... {% endif %}.\nconst outsideIfs = html.replace(/\\{%\\s*if[\\s\\S]*?\\{%\\s*endif\\s*%\\}/g, '');\nfor (const tag of outsideIfs.match(/\\{\\{[^}]*\\}\\}/g) || []) {\n  if (/first_?name/i.test(tag) && !/default[:(]\\s*['\"][^'\"]+['\"]/.test(tag)) {\n    flag(blockers, 'personalization', tag + ' has no fallback, or an empty one.', 'Use {% if first_name %} {{ first_name }}{% endif %} or a real fallback.');\n  }\n}\n\n// 2. Links: https, with lowercase utm_source, utm_medium=email and utm_campaign.\n//    Unsubscribe links and links built from template tags are skipped.\nfor (const [, url] of html.matchAll(/href=\"([^\"]*)\"/gi)) {\n  if (/unsubscribe|manage_preferences|\\{[{%]/i.test(url)) continue;\n  if (!/^https:\\/\\//i.test(url)) {\n    flag(blockers, 'links', 'Link \"' + url + '\" is empty, a placeholder or not https.', 'Use the full https URL.');\n    continue;\n  }\n  const utm = (name) => (url.match(new RegExp('[?&]utm_' + name + '=([^&#]*)')) || [])[1];\n  const values = ['source', 'medium', 'campaign'].map(utm);\n  if (values.some((v) => !v || v !== v.toLowerCase()) || utm('medium') !== 'email') {\n    flag(blockers, 'utm', url + ' lacks lowercase utm_source, utm_medium=email or utm_campaign.', 'Add ?utm_source=klaviyo&utm_medium=email&utm_campaign=<lowercase_name>.');\n  }\n}\n\n// 3. The unsubscribe tag must be there.\nif (!/unsubscribe/i.test(html)) {\n  flag(blockers, 'unsubscribe', 'No unsubscribe tag or link.', 'Add {% unsubscribe %} (Klaviyo) or {{ unsubscribe_link }} (HubSpot).');\n}\n\n// 4. Phones cut subjects near 50 characters; the preview text should add something.\nconst length = [...subject].length;\nif (length > 50) {\n  flag(warnings, 'mobile_ux', 'The subject is ' + length + ' characters; phones cut it near 50.', 'Trim it to 50 characters or fewer.');\n}\nif (!preview.trim() || preview.trim() === subject.trim()) {\n  flag(warnings, 'preview_text', 'The preview text is empty or repeats the subject.', 'Add one line the subject does not already say.');\n}\n\n// 5. Images need alt text.\nconst noAlt = (html.match(/<img\\b(?![^>]*\\balt=\"[^\"]+\")[^>]*>/gi) || []).length;\nif (noAlt) {\n  flag(warnings, 'accessibility', noAlt + ' image(s) without alt text.', 'Describe each image in its alt attribute.');\n}\n\nreturn { json: { rule_blockers: blockers, rule_warnings: warnings } };"
+      },
+      "notes": "Plain text checks anyone can read: fallbacks, https and lowercase UTMs, unsubscribe tag, subject length, preview text, alt text."
+    },
+    {
       "id": "2",
       "name": "Load Store Facts & Promo Policy Truth Table",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        400,
+        640,
         280
       ],
       "parameters": {
@@ -58,7 +73,7 @@
             {
               "id": "p5",
               "name": "vip_exclusions_required_on_promos",
-              "value": "VIP Champions, Full-Price Repeat Buyers, Purchased Last 14 Days, Active CX Promo Hold",
+              "value": "VIP Champions, Full-Price Repeat Buyers, Purchased Last 14 Days, CX hold active",
               "type": "string"
             }
           ]
@@ -69,11 +84,11 @@
     },
     {
       "id": "3",
-      "name": "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)",
+      "name": "AI: Policy Check & VIP Margin Audit (JSON)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        660,
+        880,
         280
       ],
       "continueOnFail": true,
@@ -84,24 +99,24 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'You are a CRM & Marketing Automation Pre-Flight QA auditor. Audit the email draft against technical QA rules AND the store policy truth table. Check: (1) Klaviyo Liquid / HubSpot HubL merge tags with missing or empty fallbacks, (2) commercial links missing UTMs or breaking lowercase GA4 naming, (3) mobile subject >50 chars or redundant preheader, (4) missing unsubscribe tag, (5) unsupported claims vs store facts (e.g., shipping SLA not published, rolling expiry promised on static code), (6) promotional discount detected without required VIP/Recent-Buyer/CX-Hold exclusions on the target segment. Return strictly JSON: status (PASS | FAIL), has_discount_offer (bool), blockers (array of {category, issue, fix}), warnings (array of {category, issue, fix}).' }, { role: 'user', content: JSON.stringify({ draft: $('Form / Webhook: Submit Campaign Draft').item.json.body, policy: $json }) } ] }) }}"
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'You are a CRM pre-send QA auditor. Fixed checks (merge-tag fallbacks, links, UTMs, unsubscribe tag, subject length, preview text, alt text) are already done by code: do not repeat them. Check only two things against the store policy: (1) copy claims the store cannot keep (e.g. a shipping time when published_shipping_sla is none, an expiry window on a static code), category policy_mismatch; (2) a discount or coupon offered while excluded_segments lacks the required VIP, recent-buyer and CX-hold exclusions, category vip_margin_guard. Return strictly JSON: has_discount_offer (bool), blockers (array of {category, issue, fix}), warnings (array of {category, issue, fix}).' }, { role: 'user', content: JSON.stringify({ draft: $('Form / Webhook: Submit Campaign Draft').item.json.body, policy: $json }) } ] }) }}"
       },
-      "notes": "Temperature 0.0 for deterministic rule checking + JSON output. Supports OpenAI or Google Gemini OpenAI-compatible endpoint."
+      "notes": "Temperature 0.0, JSON only. The AI gets only the judgment calls: copy against store facts, and discount exclusions."
     },
     {
       "id": "4",
-      "name": "Parse AI QA Audit Result (Safe Defaults)",
+      "name": "Merge Rule & AI Results (Safe Defaults)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        920,
+        1120,
         280
       ],
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const raw = String(\n  $json.choices?.[0]?.message?.content ||\n  $json.candidates?.[0]?.content?.parts?.[0]?.text ||\n  '{}'\n).replace(/```json|```/g, '').trim();\n\nlet parsed = null;\ntry {\n  parsed = JSON.parse(raw);\n} catch (err) {\n  parsed = null;\n}\n\nif (!parsed || typeof parsed !== 'object') {\n  return {\n    json: {\n      status: 'FAIL',\n      has_discount_offer: false,\n      blockers: [{\n        category: 'qa_engine_error',\n        issue: 'AI QA output could not be parsed cleanly',\n        fix: 'Re-run Pre-Flight QA or check API credentials before scheduling.'\n      }],\n      warnings: []\n    }\n  };\n}\n\nreturn {\n  json: {\n    status: parsed.status || 'FAIL',\n    has_discount_offer: Boolean(parsed.has_discount_offer),\n    blockers: Array.isArray(parsed.blockers) ? parsed.blockers : [],\n    warnings: Array.isArray(parsed.warnings) ? parsed.warnings : []\n  }\n};"
+        "jsCode": "// One verdict: the fixed-rule results first, then the AI's policy check.\nconst rules = $('Rules: Fixed Checks (No AI)').item.json;\nconst raw = String(\n  $json.choices?.[0]?.message?.content ||\n  $json.candidates?.[0]?.content?.parts?.[0]?.text ||\n  ''\n).replace(/```json|```/g, '').trim();\n\nlet parsed = null;\ntry {\n  parsed = JSON.parse(raw);\n} catch (err) {\n  parsed = null;\n}\n\nconst ok = parsed && typeof parsed === 'object';\nconst aiBlockers = ok && Array.isArray(parsed.blockers) ? parsed.blockers : [];\nconst aiWarnings = ok && Array.isArray(parsed.warnings) ? parsed.warnings : [];\nif (!ok) {\n  aiBlockers.push({\n    category: 'qa_engine_error',\n    issue: 'AI policy check could not be parsed cleanly',\n    fix: 'Re-run Pre-Flight QA or check API credentials before scheduling.'\n  });\n}\n\nconst blockers = [...(rules.rule_blockers || []), ...aiBlockers];\nconst warnings = [...(rules.rule_warnings || []), ...aiWarnings];\nreturn {\n  json: {\n    status: blockers.length ? 'FAIL' : 'PASS',\n    has_discount_offer: Boolean(ok && parsed.has_discount_offer),\n    blockers,\n    warnings\n  }\n};"
       },
-      "notes": "Real JavaScript Code node (n8n Community-safe try/catch). Parses JSON once so Slack prints every itemized blocker and fix cleanly."
+      "notes": "Merges the rule results and the AI result. Any blocker means FAIL; an unreadable AI answer is itself a blocker."
     },
     {
       "id": "5",
@@ -109,7 +124,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1160,
+        1360,
         280
       ],
       "parameters": {
@@ -151,7 +166,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
       "position": [
-        1440,
+        1640,
         180
       ],
       "parameters": {
@@ -173,7 +188,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
       "position": [
-        1440,
+        1640,
         380
       ],
       "parameters": {
@@ -195,7 +210,7 @@
       "main": [
         [
           {
-            "node": "Load Store Facts & Promo Policy Truth Table",
+            "node": "Rules: Fixed Checks (No AI)",
             "type": "main",
             "index": 0
           }
@@ -206,29 +221,7 @@
       "main": [
         [
           {
-            "node": "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "AI: Pre-Flight QA, Policy Check & VIP Margin Audit (JSON)": {
-      "main": [
-        [
-          {
-            "node": "Parse AI QA Audit Result (Safe Defaults)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse AI QA Audit Result (Safe Defaults)": {
-      "main": [
-        [
-          {
-            "node": "Guard: Zero Blockers (PASS)?",
+            "node": "AI: Policy Check & VIP Margin Audit (JSON)",
             "type": "main",
             "index": 0
           }
@@ -247,6 +240,39 @@
         [
           {
             "node": "Slack: BLOCKED — Fix Before Send (#crm-qa)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rules: Fixed Checks (No AI)": {
+      "main": [
+        [
+          {
+            "node": "Load Store Facts & Promo Policy Truth Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI: Policy Check & VIP Margin Audit (JSON)": {
+      "main": [
+        [
+          {
+            "node": "Merge Rule & AI Results (Safe Defaults)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Rule & AI Results (Safe Defaults)": {
+      "main": [
+        [
+          {
+            "node": "Guard: Zero Blockers (PASS)?",
             "type": "main",
             "index": 0
           }

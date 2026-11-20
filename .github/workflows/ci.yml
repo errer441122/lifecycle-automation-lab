@@ -18,7 +18,11 @@ jobs:
           w = json.load(open('workflows/ai-email-preflight-qa.n8n.json'))
           err = json.load(open('workflows/error-notifier.n8n.json'))
           p = json.load(open('config/store-facts-and-promo-policy.json'))
-          assert len(w['nodes']) == 7 and len(err['nodes']) == 2 and 'discount_policy' in p
+          assert len(w['nodes']) == 8 and len(err['nodes']) == 2 and 'discount_policy' in p
+          rules = [n for n in w['nodes'] if n['name'] == 'Rules: Fixed Checks (No AI)'][0]
+          assert rules['type'] == 'n8n-nodes-base.code', "Fixed checks run as code, not AI"
+          ai = [n for n in w['nodes'] if n['name'].startswith('AI:')][0]
+          assert '>50 chars' not in ai['parameters']['jsonBody'], "Subject length is a fixed rule"
           assert '$vars' not in json.dumps(w)
           assert any(n['type'] == 'n8n-nodes-base.code' for n in w['nodes']), "AI parser must be a real Code node"
           blocked = [n for n in w['nodes'] if 'BLOCKED' in n['name']][0]
@@ -32,3 +36,5 @@ jobs:
           test -f docs/vip-margin-protection-rules.md
           test -f docs/sop-pre-send-qa-checklist.md
           test -f docs/field-notes/klaviyo-shopify-field-notes.md
+      - name: Run the fixed-rule checks on the example drafts
+        run: node tests/fixed-rules.test.mjs

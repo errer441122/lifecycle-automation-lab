@@ -133,7 +133,7 @@ Withdrawal must be as easy as giving consent (Art. 7(3)):
 
 ## Why automated CRM syncs cannot grant consent
 
-A Klaviyo profile import writes profile attributes (`lifecycle_stage`, `cx_promo_hold`, etc.).
+A Klaviyo profile import writes profile attributes (`lifecycle_stage`, `cx_hold_until_delivery`, etc.).
 It does **not** subscribe anyone to email marketing — that requires a separate subscription call,
 which CRM automation workflows never execute on behalf of unconfirmed contacts.
 
