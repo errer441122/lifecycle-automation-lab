@@ -212,6 +212,6 @@ blocca la regressione: ogni durata che compare nella copy deve corrispondere a
 - [x] Creare `TORNA15` in Shopify — fatto, sconto ordine 15%, un utilizzo per cliente
 - [x] Togliere dalla copy le promesse che il negozio non pubblica
 - [x] Caricare le sette email nei flow — fatto, e `--verify` lo ricontrolla
-- [x] Controllo automatico prima di incollare: `python src/pre_send_check.py`
+- [x] Controllo automatico prima di incollare: il pre-send gate n8n (`workflows/ai-email-preflight-qa.n8n.json`)
 - [ ] Verificare che i merge tag rendano su un invio di prova, non in anteprima
 - [ ] Controllare i blocchi prodotto dinamici del carrello con un ordine reale
