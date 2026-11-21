@@ -1,0 +1,21 @@
+id,sector,status,dmarc_stage,spf_lookups,mailbox_provider,email_tools_in_spf,warnings_and_blockers
+SW-01,software,WARN,reject,10,Proofpoint,Proofpoint; Zendesk; Microsoft 365; Amazon SES; MailUp; HubSpot; Mailjet; Salesforce,spf_near_lookup_limit
+SW-02,software,WARN,reject,9,Proofpoint,Customerly; Amazon SES; Mailchimp; Mailchimp Transactional; Microsoft 365; SendGrid,spf_near_lookup_limit
+SW-03,software,WARN,monitoring,6,Google Workspace,Google Workspace; HubSpot; Mailchimp; Amazon SES; SendGrid,dmarc_monitoring_only; dmarc_no_reports
+SW-04,software,WARN,quarantine,6,Google Workspace,Google Workspace; Amazon SES; Zendesk; HubSpot,dmarc_subdomains_open
+SW-05,software,PASS,reject,7,Proofpoint,,
+SW-06,software,PASS,reject,5,Microsoft 365,Microsoft 365; MailUp,
+IN-01,industrial,FAIL,monitoring,12,Microsoft 365,Salesforce; Microsoft 365; SAP SuccessFactors; MagNews; Docebo,spf_too_many_lookups; dmarc_monitoring_only; dmarc_no_reports
+IN-02,industrial,WARN,monitoring,10,Trend Micro,Trend Micro; Marketo,spf_near_lookup_limit; dmarc_monitoring_only
+IN-03,industrial,WARN,monitoring,9,Microsoft 365,,spf_near_lookup_limit; dmarc_monitoring_only
+IN-04,industrial,WARN,monitoring,8,Microsoft 365,Microsoft 365; MailUp,dmarc_monitoring_only
+IN-05,industrial,WARN,monitoring,3,Microsoft 365,Microsoft 365,dmarc_monitoring_only
+IN-06,industrial,WARN,monitoring,3,other,Microsoft 365,dmarc_monitoring_only
+IN-07,industrial,WARN,reject,3,other,,dmarc_subdomains_open
+IN-08,industrial,PASS,reject,8,Proofpoint,Google Workspace; Amazon SES; Proofpoint; Salesforce; KnowBe4; Microsoft 365,
+IN-09,industrial,PASS,quarantine,6,Microsoft 365,SAP SuccessFactors; Microsoft 365; MailUp; Mailchimp Transactional,
+IN-10,industrial,PASS,reject,6,Microsoft 365,Microsoft 365; Salesforce; Docebo; SAP SuccessFactors; HubSpot,
+IN-11,industrial,PASS,quarantine,5,other,Microsoft 365; MailUp,
+IN-12,industrial,PASS,reject,2,Libraesva,,
+IN-13,industrial,PASS,reject,2,Microsoft 365,Microsoft 365,
+IN-14,industrial,PASS,quarantine,1,Microsoft 365,Microsoft 365,

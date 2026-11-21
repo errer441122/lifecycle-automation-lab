@@ -1,0 +1,135 @@
+[
+  {
+    "domain": "negozio-online.org",
+    "label": "the author's root domain (mailboxes)",
+    "status": "WARN",
+    "dmarc_stage": "monitoring",
+    "findings": [
+      {
+        "code": "dmarc_monitoring_only",
+        "level": "warning",
+        "issue": "DMARC is in monitoring mode (p=none).",
+        "plain": "Email that fakes your domain is still delivered: p=none only asks for reports.",
+        "fix": "Read the reports for a few weeks, fix what fails, then move to p=quarantine and later p=reject."
+      },
+      {
+        "code": "dmarc_no_reports",
+        "level": "warning",
+        "issue": "DMARC has no report address (rua).",
+        "plain": "Monitoring mode without a report address monitors nothing: nobody receives the reports.",
+        "fix": "Add rua=mailto:<an address you read> to the record."
+      },
+      {
+        "code": "dkim_not_checked",
+        "level": "note",
+        "issue": "DKIM was not checked: no selector is listed for this domain.",
+        "plain": "A DKIM key cannot be found from outside without its selector name.",
+        "fix": "Open a real email from this domain, find s= in the DKIM-Signature header and add it to dkim_selectors."
+      }
+    ],
+    "spf": "v=spf1 include:_spf.mx.cloudflare.net ~all",
+    "spf_lookups": 1,
+    "dmarc": "v=DMARC1; p=none;",
+    "dmarc_name": "_dmarc.negozio-online.org",
+    "mailbox_provider": "Cloudflare Email Routing",
+    "senders": [
+      "Cloudflare Email Routing"
+    ],
+    "other_includes": [],
+    "dkim_checked": [],
+    "checked_at": "2026-11-21T15:16:45.258Z"
+  },
+  {
+    "domain": "send.negozio-online.org",
+    "label": "the author's marketing sending subdomain, delegated to the email tool",
+    "status": "WARN",
+    "dmarc_stage": "monitoring",
+    "findings": [
+      {
+        "code": "spf_not_at_this_name",
+        "level": "note",
+        "issue": "No SPF record at this name.",
+        "plain": "Normal for a subdomain run by an email tool: SPF is checked on the hidden return-path address, not on the visible From address.",
+        "fix": "Open a real email from this domain and confirm the headers say spf=pass."
+      },
+      {
+        "code": "dmarc_monitoring_only",
+        "level": "warning",
+        "issue": "DMARC is in monitoring mode (p=none).",
+        "plain": "Email that fakes your domain is still delivered: p=none only asks for reports.",
+        "fix": "Read the reports for a few weeks, fix what fails, then move to p=quarantine and later p=reject."
+      },
+      {
+        "code": "dmarc_no_reports",
+        "level": "warning",
+        "issue": "DMARC has no report address (rua).",
+        "plain": "Monitoring mode without a report address monitors nothing: nobody receives the reports.",
+        "fix": "Add rua=mailto:<an address you read> to the record."
+      },
+      {
+        "code": "dmarc_inherited",
+        "level": "note",
+        "issue": "No DMARC record at this subdomain: the policy comes from _dmarc.negozio-online.org.",
+        "plain": "That is how DMARC works for subdomains.",
+        "fix": "Nothing to do unless this subdomain needs its own policy."
+      },
+      {
+        "code": "mx_missing",
+        "level": "warning",
+        "issue": "This domain cannot receive email (no MX record).",
+        "plain": "Replies and bounces sent to an address on this domain are lost.",
+        "fix": "Use a From and Reply-To address on a domain that receives email, or add MX records."
+      }
+    ],
+    "spf": "",
+    "spf_lookups": 0,
+    "dmarc": "v=DMARC1; p=none;",
+    "dmarc_name": "_dmarc.negozio-online.org",
+    "mailbox_provider": "none",
+    "senders": [],
+    "other_includes": [],
+    "dkim_checked": [
+      "s1",
+      "s2"
+    ],
+    "checked_at": "2026-11-21T15:16:47.264Z"
+  },
+  {
+    "domain": "mionegozio.com",
+    "label": "someone else's parked domain: the trap from the field notes",
+    "status": "FAIL",
+    "dmarc_stage": "invalid",
+    "findings": [
+      {
+        "code": "dmarc_not_a_policy",
+        "level": "blocker",
+        "issue": "A TXT record answers at _dmarc.mionegozio.com but it is not a DMARC policy (\"v=spf1 -all\").",
+        "plain": "A dashboard can show this as verified, yet providers find no policy. The usual cause is a wildcard record on a parked or misconfigured domain.",
+        "fix": "Check you are working on the right domain, then publish a record that starts with v=DMARC1 at _dmarc."
+      },
+      {
+        "code": "mx_missing",
+        "level": "warning",
+        "issue": "This domain cannot receive email (no MX record).",
+        "plain": "Replies and bounces sent to an address on this domain are lost.",
+        "fix": "Use a From and Reply-To address on a domain that receives email, or add MX records."
+      },
+      {
+        "code": "dkim_not_checked",
+        "level": "note",
+        "issue": "DKIM was not checked: no selector is listed for this domain.",
+        "plain": "A DKIM key cannot be found from outside without its selector name.",
+        "fix": "Open a real email from this domain, find s= in the DKIM-Signature header and add it to dkim_selectors."
+      }
+    ],
+    "spf": "v=spf1 -all",
+    "spf_lookups": 0,
+    "dmarc": "",
+    "dmarc_name": "_dmarc.mionegozio.com",
+    "mailbox_provider": "none",
+    "senders": [],
+    "other_includes": [],
+    "dkim_checked": [],
+    "checked_at": "2026-11-21T15:16:47.859Z"
+  }
+]

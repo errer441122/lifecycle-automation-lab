@@ -1,4 +1,4 @@
-name: Validate Workflows & Policy
+name: Validate Workflow, Data & Docs
 
 on:
   push:
@@ -11,30 +11,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify n8n workflow JSONs, Code node parser, Slack v2.2 itemized blockers, policy JSON, and docs
+      - name: Verify the n8n workflow files and the data from the real run
         run: |
           python3 - <<'PY'
-          import json
-          w = json.load(open('workflows/ai-email-preflight-qa.n8n.json'))
+          import csv, json
+          w = json.load(open('workflows/sender-domain-health.n8n.json'))
           err = json.load(open('workflows/error-notifier.n8n.json'))
-          p = json.load(open('config/store-facts-and-promo-policy.json'))
-          assert len(w['nodes']) == 8 and len(err['nodes']) == 2 and 'discount_policy' in p
-          rules = [n for n in w['nodes'] if n['name'] == 'Rules: Fixed Checks (No AI)'][0]
-          assert rules['type'] == 'n8n-nodes-base.code', "Fixed checks run as code, not AI"
-          ai = [n for n in w['nodes'] if n['name'].startswith('AI:')][0]
-          assert '>50 chars' not in ai['parameters']['jsonBody'], "Subject length is a fixed rule"
-          assert '$vars' not in json.dumps(w)
-          assert any(n['type'] == 'n8n-nodes-base.code' for n in w['nodes']), "AI parser must be a real Code node"
-          blocked = [n for n in w['nodes'] if 'BLOCKED' in n['name']][0]
-          assert 'b.category' in blocked['parameters']['text'] and 'b.fix' in blocked['parameters']['text']
+          assert len(w['nodes']) == 10 and len(err['nodes']) == 2
+          assert '$vars' not in json.dumps(w), "Community n8n does not support $vars"
+          names = {n['name'] for n in w['nodes']}
+          targets = {t['node'] for c in w['connections'].values() for group in c['main'] for t in group}
+          assert targets <= names and set(w['connections']) <= names, "A connection points at a missing node"
+          lookups = [n for n in w['nodes'] if n['name'].startswith('DNS Lookups')][0]
+          assert 'this.helpers.httpRequest' in lookups['parameters']['jsCode'] and 'credentials' not in lookups
           for wf in (w, err):
               for n in wf['nodes']:
+                  assert 'credentials' not in n, "Workflow files must not carry credentials"
                   if n['type'] == 'n8n-nodes-base.slack':
                       assert n['parameters'].get('select') == 'channel' and 'channelId' in n['parameters']
+          rows = list(csv.DictReader(open('data/italian-b2b-sample-2026-11-21.csv')))
+          assert len(rows) == 20 and not any('.' in r['id'] for r in rows), "The sample has 20 rows and no domain names"
+          own = json.load(open('data/own-domains-2026-11-21.json'))
+          assert [v['domain'] for v in own] == ['negozio-online.org', 'send.negozio-online.org', 'mionegozio.com']
           PY
-          test -f prompts/email-policy-qa-prompt.md
-          test -f docs/vip-margin-protection-rules.md
-          test -f docs/sop-pre-send-qa-checklist.md
+          test -f docs/rules.md
+          test -f docs/index.html
           test -f docs/field-notes/klaviyo-shopify-field-notes.md
-      - name: Run the fixed-rule checks on the example drafts
-        run: node tests/fixed-rules.test.mjs
+      - name: Run the workflow's nodes against canned DNS answers
+        run: node tests/workflow.test.mjs

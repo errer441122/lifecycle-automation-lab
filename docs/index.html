@@ -4,259 +4,272 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>CRM Pre-Send QA: live showcase</title>
-<meta name="description" content="An n8n pre-send gate that checks email drafts against store policy and VIP margin rules, built from Klaviyo, Shopify and DNS failures found while running live flows.">
+<title>Sender Domain Health: live SPF, DKIM and DMARC check</title>
+<meta name="description" content="Check any sending domain live: an n8n workflow reads SPF, DKIM and DMARC from public DNS, grades them with fixed rules and alerts when they change. Run on 20 real Italian B2B companies.">
 <link rel="preload" href="fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 @font-face { font-family: "Archivo"; src: url("fonts/archivo-latin-wdth-normal.woff2") format("woff2"); font-weight: 100 900; font-stretch: 62% 125%; font-display: swap; }
 @font-face { font-family: "Geist Mono"; src: url("fonts/geist-mono-400.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 
+/* Corporate B2B language: white and cool greys, one institutional navy, hairlines, restrained motion. */
 :root {
   color-scheme: light;
-  --page: #f6f5f7; --panel: #fdfcfd; --sunk: #ecebef;
-  --ink: #1a171d; --ink-2: #3b3641; --muted: #605a67;
-  --line: #dbd6de; --line-soft: #e9e6ec;
-  --accent: #b5175a; --accent-ink: #fff6fa; --accent-soft: #f9e5ed; --accent-line: #e7a2bf;
-  --pass: #1d7a4a; --pass-soft: #e2f2e9; --warn: #9a5b06; --warn-soft: #f8ecd8;
-  --term: #1d1b21; --term-ink: #e9e5ee; --term-dim: #9d96a6;
-  --r: 4px;
+  --page: #ffffff; --band: #f4f6f9; --panel: #ffffff; --sunk: #edf0f4;
+  --ink: #0e1a2b; --ink-2: #34465a; --muted: #5a6b7d;
+  --line: #d5dce4; --line-soft: #e6ebf0; --field: #b3bfcc;
+  --accent: #0b3d91; --accent-hover: #082e6e; --accent-ink: #ffffff; --accent-soft: #e8eef9; --accent-line: #a9bfe6;
+  --pass: #157347; --pass-soft: #e3f3ea; --warn: #8f5200; --warn-soft: #fbefd9; --fail: #b42318; --fail-soft: #fbe9e7;
+  --sq: #a9b6c4; --warn-fill: #d48a1c; --fail-fill: #c8372a;
+  --term: #0e1a2b; --term-ink: #e6edf5; --term-dim: #8fa1b5; --term-hl: #ffd08a;
+  --shadow: 0 1px 2px rgb(14 26 43 / .06), 0 10px 28px rgb(14 26 43 / .08);
+  --r: 4px; --r-lg: 8px;
   --sans: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "Geist Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --page: #131115; --panel: #1b181e; --sunk: #242027;
-    --ink: #f5f2f6; --ink-2: #d6d0da; --muted: #a59ead;
-    --line: #332e37; --line-soft: #2a262e;
-    --accent: #f37aa6; --accent-ink: #2a0616; --accent-soft: rgb(243 122 166 / .13); --accent-line: rgb(243 122 166 / .45);
-    --pass: #5fd08f; --pass-soft: rgb(95 208 143 / .12); --warn: #f0b44c; --warn-soft: rgb(240 180 76 / .12);
-    --term: #0d0c0f; --term-ink: #e9e5ee; --term-dim: #8f889a;
+    --page: #0b1320; --band: #0f1a2a; --panel: #111e30; --sunk: #17263b;
+    --ink: #eef3f9; --ink-2: #c5d1de; --muted: #93a4b7;
+    --line: #25374d; --line-soft: #1b2b40; --field: #3a4d66;
+    --accent: #7db0ff; --accent-hover: #a3c8ff; --accent-ink: #06162c; --accent-soft: rgb(125 176 255 / .12); --accent-line: rgb(125 176 255 / .42);
+    --pass: #5fd08f; --pass-soft: rgb(95 208 143 / .13); --warn: #f0b44c; --warn-soft: rgb(240 180 76 / .13); --fail: #ff8f80; --fail-soft: rgb(255 143 128 / .13);
+    --sq: #4d6079; --warn-fill: #e0a030; --fail-fill: #ff7a68;
+    --term: #070d17; --term-ink: #e6edf5; --term-dim: #8296ad; --term-hl: #ffd08a;
+    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 10px 28px rgb(0 0 0 / .32);
   }
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--page); color: var(--ink); font: 17px/1.6 var(--sans); font-stretch: 100%; }
-a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-a:hover { color: var(--accent); }
-code { font-family: var(--mono); font-size: .82em; background: var(--sunk); padding: 1px 5px; border-radius: 3px; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 17px/1.6 var(--sans); font-stretch: 100%; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { color: var(--accent-hover); }
+code { font-family: var(--mono); font-size: .84em; background: var(--sunk); padding: 1px 6px; border-radius: 3px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
-h1, h2, h3 { margin: 0; }
-.cond { font-stretch: 72%; font-weight: 780; letter-spacing: -0.01em; }
-h2 { font-stretch: 72%; font-weight: 760; font-size: clamp(34px, 4vw, 54px); line-height: .98; letter-spacing: -0.01em; }
-.sub2 { color: var(--muted); max-width: 60ch; margin: 14px 0 0; }
+.wrap { max-width: 1216px; margin: 0 auto; padding: 0 32px; }
+h1, h2, h3 { margin: 0; font-weight: 600; }
+h2 { font-size: clamp(28px, 3vw, 40px); line-height: 1.14; letter-spacing: -0.018em; overflow-wrap: anywhere; }
+.sub2 { color: var(--muted); max-width: 64ch; margin: 14px 0 0; font-size: 18px; }
+.band { padding: 96px 0; scroll-margin-top: 68px; }
+.band.alt { background: var(--band); border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
 
-/* nav */
-.nav { border-bottom: 2px solid var(--ink); }
-.nav .wrap { display: flex; align-items: center; gap: 28px; height: 62px; }
-.brand { font-stretch: 72%; font-weight: 800; font-size: 21px; text-decoration: none; letter-spacing: .005em; white-space: nowrap; }
-.brand span { color: var(--accent); }
-.nav-links { display: flex; gap: 24px; margin-left: auto; font-size: 15px; white-space: nowrap; }
-.nav-links a { text-decoration: none; color: var(--ink-2); }
+/* header */
+.nav { position: sticky; top: 0; z-index: 10; background: var(--page); border-bottom: 1px solid var(--line); }
+.nav .wrap { display: flex; align-items: center; gap: 32px; height: 68px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; color: var(--ink); text-decoration: none; white-space: nowrap; letter-spacing: -0.005em; }
+.brand::before { content: ""; width: 14px; height: 14px; background: var(--accent); border-radius: 2px; }
+.brand:hover { color: var(--ink); }
+.nav-links { display: flex; gap: 28px; margin-left: auto; font-size: 15px; white-space: nowrap; }
+.nav-links a { color: var(--ink-2); text-decoration: none; }
 .nav-links a:hover { color: var(--accent); }
-.lang-switch { display: inline-flex; padding: 2px; border: 1.5px solid var(--ink); border-radius: var(--r); background: var(--panel); gap: 2px; flex-shrink: 0; }
-.lang-switch button { font: 600 12px/1 var(--mono); padding: 6px 9px; border: 0; border-radius: 2px; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+.lang-switch { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; flex-shrink: 0; }
+.lang-switch button { font: 600 12.5px/1 var(--sans); letter-spacing: .03em; padding: 8px 11px; border: 0; background: var(--page); color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+.lang-switch button + button { border-left: 1px solid var(--line); }
 .lang-switch button:hover { color: var(--ink); }
 .lang-switch button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 
 /* hero */
-.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; padding-top: 64px; padding-bottom: 72px; align-items: center; }
-.eyebrow { font: 13px var(--mono); color: var(--accent); margin: 0 0 16px; }
-h1 { font-stretch: 70%; font-weight: 800; font-size: clamp(48px, 5.8vw, 76px); line-height: .92; letter-spacing: -0.012em; }
-.lede { font-size: 19px; color: var(--ink-2); max-width: 42ch; margin: 24px 0 32px; }
+.hero-band { background: var(--band); border-bottom: 1px solid var(--line-soft); }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 64px; padding-top: 80px; padding-bottom: 80px; align-items: center; }
+h1 { font-size: clamp(36px, 4vw, 54px); line-height: 1.08; letter-spacing: -0.026em; font-weight: 620; }
+.lede { font-size: 19px; color: var(--ink-2); max-width: 44ch; margin: 22px 0 32px; }
 .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
-.btn { display: inline-flex; align-items: center; height: 50px; padding: 0 22px; border-radius: var(--r); font: 650 16px var(--sans); text-decoration: none; white-space: nowrap; background: var(--accent); color: var(--accent-ink); border: 2px solid var(--accent); transition: transform .2s cubic-bezier(.16,1,.3,1), box-shadow .2s; }
-.btn:hover { color: var(--accent-ink); box-shadow: 4px 4px 0 var(--ink); transform: translate(-2px, -2px); }
-.btn:active { transform: translate(0, 0); box-shadow: none; }
-.btn.ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
-.btn.ghost:hover { color: var(--ink); }
-.hero-card { margin: 0; border: 2px solid var(--ink); border-radius: var(--r); background: var(--panel); box-shadow: 12px 12px 0 var(--accent-soft); }
-.hero-card .mail { border: 0; border-radius: 0; }
-.stamp { display: flex; align-items: baseline; gap: 12px; padding: 14px 18px; border-top: 2px solid var(--ink); background: var(--accent-soft); font: 13px var(--mono); color: var(--ink-2); }
-.stamp b { font: 800 26px/1 var(--sans); font-stretch: 70%; color: var(--accent); }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0 22px; border-radius: var(--r); font: 600 16px var(--sans); text-decoration: none; white-space: nowrap; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); cursor: pointer; transition: background .18s, border-color .18s, transform .12s; }
+.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--accent-ink); }
+.btn:active { transform: translateY(1px); }
+.btn.ghost { background: transparent; color: var(--accent); border-color: var(--accent-line); }
+.btn.ghost:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.btn[disabled] { opacity: .55; cursor: progress; }
 
-/* QA simulator */
-section.band { padding-top: 104px; }
-.drafts { display: flex; flex-wrap: wrap; gap: 0; margin-top: 34px; border-bottom: 2px solid var(--ink); }
-.tab { font: 600 16px var(--sans); color: var(--muted); background: none; border: 0; border-bottom: 4px solid transparent; margin-bottom: -2px; padding: 12px 18px 12px 0; margin-right: 22px; cursor: pointer; text-align: left; }
-.tab small { display: block; font: 12px var(--mono); }
-.tab:hover { color: var(--ink); }
-.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-.qa { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; margin-top: 30px; align-items: start; }
-.qa h3 { font-stretch: 72%; font-weight: 750; font-size: 24px; margin-bottom: 12px; }
-.mail { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
-.mail-head { padding: 16px 18px; border-bottom: 1px solid var(--line-soft); font-size: 14px; display: grid; gap: 6px; }
-.mail-head .row { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
-.mail-head .k { color: var(--muted); }
-.subj { font-weight: 650; overflow-wrap: anywhere; }
-.subj .over { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--accent); }
-.subj .cut { display: inline-block; width: 2px; height: 1.05em; background: var(--accent); vertical-align: -2px; margin: 0 2px; }
-.count { font: 12px var(--mono); color: var(--muted); }
-.count.bad { color: var(--accent); }
-.mail-body { padding: 18px 20px 22px; font-size: 16px; line-height: 1.55; }
-.mail-body p { margin: 0 0 12px; }
-.mark { background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); padding: 0 2px; }
-.mark sup { font: 10.5px var(--mono); color: var(--accent); margin-left: 2px; }
-.ok { box-shadow: inset 0 -2px 0 var(--pass); padding: 0 2px; }
-.cta { display: inline-block; margin: 6px 0 10px; padding: 11px 20px; border-radius: 3px; background: var(--ink); color: var(--page); font-weight: 650; font-size: 15px; }
-.url { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
-.aud { display: flex; flex-wrap: wrap; gap: 6px 8px; padding: 14px 18px; border-top: 1px solid var(--line-soft); font-size: 13.5px; }
-.aud b { font-weight: 600; margin-right: 4px; }
-.pill { font: 12px var(--mono); border-radius: 999px; padding: 2px 10px; background: var(--sunk); }
-.pill.missing { background: var(--accent-soft); color: var(--accent); }
-.pill.on { background: var(--pass-soft); color: var(--pass); }
+/* the checker */
+.hero-card { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+.checker { padding: 24px 24px 20px; display: grid; gap: 8px; }
+.checker label { font-weight: 600; font-size: 15px; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.checker input { width: 100%; height: 48px; padding: 0 14px; border: 1px solid var(--field); border-radius: var(--r); background: var(--panel); color: var(--ink); font: 16px var(--mono); transition: border-color .15s, box-shadow .15s; }
+.checker input:focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.checker input::placeholder { color: var(--muted); }
+.help { margin: 0; font-size: 13.5px; color: var(--muted); }
+.err { margin: 0; font-size: 14px; color: var(--fail); font-weight: 600; }
+.adv { margin-top: 2px; }
+.adv summary { cursor: pointer; font-size: 14px; color: var(--ink-2); width: fit-content; }
+.adv .inner { display: grid; gap: 6px; margin-top: 8px; }
+.adv input { height: 42px; font-size: 14.5px; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 6px; font-size: 13.5px; color: var(--muted); }
+.chip { font: 12.5px var(--mono); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; background: var(--panel); color: var(--ink-2); cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.stamp { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 2px 16px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--band); font-size: 13.5px; color: var(--muted); min-height: 78px; }
+.stamp b { grid-row: span 2; font: 700 12.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; padding: 9px 12px; border-radius: var(--r); background: var(--sunk); color: var(--muted); white-space: nowrap; }
+.stamp .dom { font: 15px var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.stamp .meta { grid-column: 2; }
+.stamp a { grid-row: 1 / span 2; grid-column: 3; font-weight: 600; font-size: 14.5px; white-space: nowrap; }
+.stamp.pass b { background: var(--pass-soft); color: var(--pass); }
+.stamp.warn b { background: var(--warn-soft); color: var(--warn); }
+.stamp.fail b { background: var(--fail-soft); color: var(--fail); }
+.stamp.busy b { animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .4; } }
 
-.verdict { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 2px solid var(--ink); }
-.verdict b { font-stretch: 70%; font-weight: 800; font-size: 46px; line-height: 1; letter-spacing: 0; }
-.verdict.fail b { color: var(--accent); }
-.verdict.pass b { color: var(--pass); }
-.verdict span { font: 13px var(--mono); color: var(--muted); }
-.issues { list-style: none; margin: 0; padding: 0; }
-.issues li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 2px 10px; padding: 14px 0; border-bottom: 1px solid var(--line-soft); animation: in .4s cubic-bezier(.16,1,.3,1) both; }
-.issues .n { font: 12px/22px var(--mono); width: 22px; height: 22px; border-radius: 50%; text-align: center; background: var(--accent); color: var(--accent-ink); }
-.issues .w .n { background: var(--warn); color: var(--panel); }
-.issues .cat { font: 12px var(--mono); color: var(--muted); }
-.issues .cat b { font-weight: 400; color: var(--accent); }
-.issues .w .cat b { color: var(--warn); }
-.issues p { grid-column: 2; margin: 2px 0 0; font-size: 15.5px; overflow-wrap: anywhere; }
-.issues .fix { color: var(--muted); font-size: 14.5px; }
-.by { display: inline-block; font: 500 10.5px/1.6 var(--mono); padding: 0 6px; margin-left: 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); vertical-align: 1px; }
-.by.ai { border-color: var(--accent); color: var(--accent); }
-.clean { padding: 16px 0; color: var(--ink-2); }
+/* key figures */
+.figures-band { border-bottom: 1px solid var(--line-soft); }
+.figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.figures div { padding: 30px 28px 32px 0; }
+.figures div + div { border-left: 1px solid var(--line-soft); padding-left: 28px; }
+.figures b { display: block; font-weight: 600; font-size: clamp(34px, 3.4vw, 46px); line-height: 1; letter-spacing: -0.02em; min-height: 1em; }
+.figures span { display: block; margin-top: 10px; color: var(--muted); font-size: 15px; line-height: 1.4; max-width: 24ch; }
+
+/* verdict */
+.vgrid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; margin-top: 40px; align-items: start; }
+.issues { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.issues li { padding: 20px 0; border-bottom: 1px solid var(--line-soft); animation: in .4s cubic-bezier(.16,1,.3,1) both; }
+.issues .cat { display: inline-block; font: 700 11.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 3px; background: var(--fail-soft); color: var(--fail); }
+.issues .w .cat { background: var(--warn-soft); color: var(--warn); }
+.issues .o .cat { background: var(--sunk); color: var(--muted); }
+.issues h3 { font: 600 18px/1.35 var(--sans); margin-top: 10px; overflow-wrap: anywhere; }
+.issues p { margin: 4px 0 0; font-size: 15.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.issues p b { font-weight: 600; color: var(--ink); }
+.clean { margin: 0; padding: 20px 22px; border: 1px solid var(--line); border-left: 4px solid var(--pass); border-radius: var(--r); background: var(--panel); font-size: 18px; }
+.notes { margin-top: 16px; }
+.notes summary { cursor: pointer; font-size: 15px; color: var(--ink-2); width: fit-content; }
+.notes .issues { border-top: 0; margin-top: 4px; }
 @keyframes in { from { opacity: 0; transform: translateY(6px); } }
-.slack { margin-top: 20px; border-left: 4px solid var(--ink); padding: 4px 0 4px 16px; font-size: 15px; }
-.slack .ch { font: 12px var(--mono); color: var(--muted); margin-bottom: 4px; }
-.slack p { margin: 0 0 3px; overflow-wrap: anywhere; }
-.small { font-size: 13.5px; color: var(--muted); margin: 14px 0 0; }
-
-/* findings */
-.cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; margin-top: 36px; background: var(--ink); border: 2px solid var(--ink); border-radius: var(--r); overflow: hidden; }
-.case { background: var(--panel); padding: 26px 28px 28px; display: flex; flex-direction: column; gap: 12px; }
-.case h3 { font-stretch: 74%; font-weight: 760; font-size: 28px; line-height: 1.02; }
-.case p { margin: 0; color: var(--ink-2); font-size: 15.5px; }
-.case .rule { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line-soft); font-size: 15px; }
-.case .rule b { color: var(--accent); font-weight: 650; }
-.term { background: var(--term); color: var(--term-ink); border-radius: 3px; padding: 14px 16px; font: 12.5px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.facts { margin: 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }
+.facts div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line-soft); }
+.facts div:last-child { border-bottom: 0; }
+.facts dt { font-size: 14px; color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.facts dd small { display: block; font: 400 12.5px var(--mono); color: var(--muted); margin-top: 4px; }
+.pill { display: inline-block; font: 12px var(--mono); border-radius: 999px; padding: 3px 10px; background: var(--sunk); margin: 0 4px 4px 0; font-weight: 400; }
+.term { background: var(--term); color: var(--term-ink); border-radius: var(--r-lg); padding: 18px 20px; font: 12.5px/1.65 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 16px 0 0; }
 .term .d { color: var(--term-dim); }
-.term .hl { color: #ff9cc2; }
-.thumb { padding: 0; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; contain: paint; cursor: zoom-in; background: var(--sunk); }
-.thumb img { display: block; width: 100%; height: 150px; object-fit: cover; object-position: 50% 30%; transition: transform .4s cubic-bezier(.16,1,.3,1); }
-.case.tint { background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--panel); }
-.vs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.vs div { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 10px 12px; font-size: 14.5px; }
-.vs small { display: block; font: 11.5px var(--mono); color: var(--muted); margin-bottom: 4px; }
-.vs s { text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+.term .hl { color: var(--term-hl); }
 
-/* run timeline */
-.run { margin-top: 44px; }
-.rail { position: relative; height: 2px; background: var(--line); margin: 64px 8px 0; }
-.ev { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 16px; height: 16px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); }
-.ev.last { background: var(--accent); }
-.ev.first time { left: 0; transform: none; }
-.ev.last time { left: auto; right: 0; transform: none; }
-.ev time { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); font: 13px var(--mono); white-space: nowrap; color: var(--ink); }
-.gap { position: absolute; top: 14px; transform: translateX(-50%); font: 12px var(--mono); color: var(--accent); white-space: nowrap; }
-.evs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; margin-top: 52px; }
-.evs div { border-top: 2px solid var(--ink); padding-top: 12px; }
-.evs b { display: block; font-stretch: 74%; font-weight: 750; font-size: 21px; line-height: 1.1; }
-.evs p { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
-.run .small { max-width: 76ch; }
+/* story */
+.story { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 56px; margin-top: 32px; align-items: start; }
+.story p { margin: 0 0 16px; color: var(--ink-2); max-width: 60ch; }
+.story .rule { font-weight: 600; color: var(--ink); border-left: 3px solid var(--accent); padding: 2px 0 2px 16px; margin: 24px 0 28px; }
+.thumb { display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; contain: paint; cursor: zoom-in; background: var(--term); box-shadow: var(--shadow); }
+.thumb img { display: block; width: 100%; height: auto; transition: transform .4s cubic-bezier(.16,1,.3,1); }
+.thumb:hover img { transform: scale(1.015); }
+figure { margin: 0; }
+figcaption { font-size: 13.5px; color: var(--muted); margin-top: 10px; }
 
-/* margin rules */
-.ruler { margin-top: 40px; }
-.band-row { display: grid; grid-template-columns: 3.5fr 19fr 22.5fr 46fr 9fr; gap: 3px; }
-.zone { height: 64px; border-radius: 3px; background: var(--sunk); position: relative; transform-origin: left; animation: grow .8s cubic-bezier(.16,1,.3,1) both; }
-.zone.yes { background: var(--accent); }
-.zone.sunset { background: repeating-linear-gradient(-45deg, var(--line) 0 5px, transparent 5px 10px); border: 1px solid var(--line); }
+/* sample */
+.eyebrow { font: 600 13px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
+.bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; margin-top: 40px; }
+.cell { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); padding: 24px 26px 26px; min-width: 0; }
+.cell h3 { font-size: 19px; line-height: 1.25; }
+.cell > p { margin: 6px 0 0; color: var(--muted); font-size: 15px; max-width: 58ch; }
+.c-dmarc { grid-column: span 5; } .c-spf { grid-column: span 7; } .c-tools { grid-column: span 7; } .c-mail { grid-column: span 5; }
+.bars { list-style: none; margin: 20px 0 0; padding: 0; display: grid; gap: 11px; }
+.bars li { display: grid; grid-template-columns: var(--lw, 170px) minmax(0, 1fr); gap: 14px; align-items: center; font-size: 15px; }
+.bars .lb { color: var(--ink-2); line-height: 1.25; }
+.bars .bw { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bars .bar { height: 14px; width: calc(var(--v) * (100% - 40px)); min-width: 2px; background: var(--accent); border-radius: 0 2px 2px 0; transform-origin: left; animation: grow .8s cubic-bezier(.16,1,.3,1) both; }
+.bars .val { font: 14px var(--mono); color: var(--ink); }
+.bars li.zero .bar { background: var(--line); }
+.take { margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 15px; color: var(--ink-2); }
+.take b { color: var(--ink); font-weight: 600; }
 @keyframes grow { from { transform: scaleX(0); } }
-.zone:nth-child(2) { animation-delay: .06s; } .zone:nth-child(3) { animation-delay: .12s; } .zone:nth-child(4) { animation-delay: .18s; } .zone:nth-child(5) { animation-delay: .24s; }
-.days { display: grid; grid-template-columns: 3.5fr 19fr 22.5fr 46fr 9fr; gap: 3px; font: 12px var(--mono); color: var(--muted); margin-top: 8px; }
-.labels { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; margin-top: 26px; }
-.labels div { font-size: 15px; color: var(--ink-2); }
-.labels b { display: block; font-stretch: 76%; font-weight: 750; font-size: 19px; color: var(--ink); }
-.labels .y b { color: var(--accent); }
-.never { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 32px; padding: 24px 0 0; border-top: 2px solid var(--ink); }
-.never h3 { font-stretch: 74%; font-weight: 760; font-size: 28px; line-height: 1.05; }
-.never ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.never li { font-size: 16px; }
-.never li b { font-weight: 650; }
-.seg-def { margin: 18px 0 0; font: 13px/1.6 var(--mono); background: var(--sunk); padding: 12px 14px; border-radius: 3px; white-space: pre-wrap; }
-
-/* gate */
-.gate { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; margin-top: 30px; }
-.gate .checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
-.checks { list-style: none; margin: 0; padding: 0; counter-reset: c; }
-.checks li { counter-increment: c; display: grid; grid-template-columns: 40px 1fr; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
-.checks li::before { content: counter(c, decimal-leading-zero); font: 13px var(--mono); color: var(--accent); padding-top: 3px; }
-.checks b { font-weight: 650; display: block; }
-.checks span { color: var(--muted); font-size: 15px; }
-.graphbox { border: 2px solid var(--ink); border-radius: var(--r); background: var(--panel); overflow-x: auto; }
-.canvas { position: relative; min-width: 640px; }
-.canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.edge { fill: none; stroke: var(--muted); stroke-width: 1.5; opacity: .6; }
-.elabel { font: 11px var(--mono); fill: var(--muted); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; }
-.node { position: absolute; width: 104px; padding: 7px 9px; border: 1.5px solid var(--ink); border-radius: 3px; background: var(--panel); font-size: 12px; line-height: 1.25; font-weight: 600; }
-.node .k { display: block; font: 400 10.5px var(--mono); color: var(--muted); margin-bottom: 2px; }
-.node.pass { border-color: var(--pass); }
-.node.fail { border-color: var(--accent); }
-.node.err { border-style: dashed; border-color: var(--line); color: var(--muted); }
+.strip { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 6px; margin-top: 22px; align-items: end; }
+.col { display: grid; gap: 6px; justify-items: center; }
+.col .sq-stack { display: flex; flex-direction: column-reverse; gap: 4px; min-height: 118px; width: 100%; align-items: center; }
+.sq { width: min(100%, 28px); aspect-ratio: 1; border-radius: 2px; background: var(--sq); animation: in .45s cubic-bezier(.16,1,.3,1) both; }
+.sq.near { background: var(--warn-fill); }
+.sq.over { background: var(--fail-fill); }
+.col .x { font: 12px var(--mono); color: var(--muted); border-top: 1px solid var(--line); width: 100%; text-align: center; padding-top: 5px; }
+.col.limit { position: relative; }
+.col.limit::after { content: ""; position: absolute; top: 0; bottom: 22px; right: -4px; border-right: 2px dashed var(--ink-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 16px; font-size: 14px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 12px; height: 12px; border-radius: 2px; background: var(--sq); }
+.legend i.near { background: var(--warn-fill); } .legend i.over { background: var(--fail-fill); }
+.legend i.dash { width: 0; height: 15px; border-radius: 0; border-right: 2px dashed var(--ink-2); background: none; }
+.sample-note { margin: 32px 0 0; font-size: 15px; color: var(--muted); max-width: 86ch; }
 .graph-msg { padding: 36px 18px; text-align: center; color: var(--muted); }
 
-/* files */
-.files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; margin-top: 30px; border-top: 2px solid var(--ink); }
-.files a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 16px 0; border-bottom: 1px solid var(--line); text-decoration: none; }
-.files a:hover { color: inherit; }
+/* workflow */
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; margin-top: 40px; }
+.steps div { border-top: 2px solid var(--accent); padding-top: 14px; }
+.steps b { display: block; font-weight: 600; font-size: 19px; }
+.steps p { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+.graphbox { margin-top: 36px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); overflow-x: auto; }
+.canvas { position: relative; min-width: 860px; }
+.canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.edge { fill: none; stroke: var(--muted); stroke-width: 1.25; opacity: .7; }
+.elabel { font: 11px var(--mono); fill: var(--muted); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; }
+.node { position: absolute; width: 108px; padding: 8px 10px; border: 1px solid var(--field); border-radius: var(--r); background: var(--panel); font-size: 12px; line-height: 1.25; font-weight: 600; }
+.node .k { display: block; font: 400 10.5px var(--mono); color: var(--muted); margin-bottom: 2px; }
+.node.live { border-color: var(--accent); background: var(--accent-soft); }
+.ran { margin: 20px 0 0; font-size: 15px; color: var(--ink-2); max-width: 88ch; padding: 4px 0 4px 16px; border-left: 3px solid var(--accent); }
+
+/* limits and files */
+.limits { list-style: none; margin: 32px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; border-top: 1px solid var(--line); }
+.limits li { padding: 18px 0; border-bottom: 1px solid var(--line-soft); font-size: 16px; color: var(--ink-2); }
+.limits b { display: block; color: var(--ink); font-weight: 600; }
+.files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 48px; margin-top: 56px; border-top: 1px solid var(--line); }
+.files a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding: 16px 0; border-bottom: 1px solid var(--line-soft); text-decoration: none; color: var(--ink); }
+.files a:hover { color: var(--ink); }
 .files a:hover .p { color: var(--accent); }
-.files .p { font: 13px var(--mono); overflow-wrap: anywhere; }
+.files .p { font: 13px var(--mono); overflow-wrap: anywhere; transition: color .15s; }
 .files .d { grid-column: 1; color: var(--muted); font-size: 15px; }
-.files .go { grid-row: span 2; align-self: center; font: 13px var(--mono); color: var(--accent); }
-.honest { margin-top: 30px; font-size: 15px; color: var(--ink-2); max-width: 78ch; padding: 16px 18px; background: var(--sunk); border-radius: var(--r); }
+.files .go { grid-row: span 2; align-self: center; font-weight: 600; font-size: 14px; color: var(--accent); }
+.honest { margin: 32px 0 0; font-size: 15px; color: var(--ink-2); max-width: 82ch; padding: 16px 20px; background: var(--band); border: 1px solid var(--line-soft); border-radius: var(--r); }
 
-/* lightbox */
 dialog { border: 0; padding: 0; background: transparent; max-width: min(1500px, 94vw); }
-dialog::backdrop { background: rgb(12 10 14 / .82); }
-dialog img { display: block; max-width: 100%; max-height: 86vh; border-radius: 3px; }
-dialog button { position: absolute; top: 10px; right: 10px; font: 600 14px var(--sans); border: 0; border-radius: 3px; padding: 8px 12px; background: var(--panel); color: var(--ink); cursor: pointer; }
+dialog::backdrop { background: rgb(8 14 24 / .84); }
+dialog img { display: block; max-width: 100%; max-height: 86vh; border-radius: var(--r); }
+dialog button { position: absolute; top: 10px; right: 10px; font: 600 14px var(--sans); border: 0; border-radius: var(--r); padding: 8px 12px; background: var(--panel); color: var(--ink); cursor: pointer; }
 
-footer { margin-top: 110px; border-top: 2px solid var(--ink); }
-footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; padding-top: 26px; padding-bottom: 44px; font-size: 15px; color: var(--muted); }
-footer .who { color: var(--ink); font-stretch: 74%; font-weight: 800; font-size: 19px; margin-right: auto; }
+footer { border-top: 1px solid var(--line); background: var(--band); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; padding-top: 28px; padding-bottom: 40px; font-size: 15px; color: var(--muted); }
+footer .who { color: var(--ink); font-weight: 650; font-size: 16px; margin-right: auto; }
 footer a { color: var(--ink-2); text-decoration: none; }
 footer a:hover { color: var(--accent); }
 
 @media (max-width: 1020px) {
-  .hero, .qa, .gate { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .hero, .vgrid, .story { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .hero { padding-top: 56px; padding-bottom: 56px; }
   .nav-links .proj { display: none; }
-  .labels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .c-dmarc, .c-spf, .c-tools, .c-mail { grid-column: 1 / -1; }
+  .steps, .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .figures div:nth-child(3) { border-left: 0; padding-left: 0; }
+  .figures div:nth-child(n+3) { border-top: 1px solid var(--line-soft); }
+  .band { padding: 72px 0; }
 }
 @media (max-width: 720px) {
-  .wrap { padding-left: 18px; padding-right: 18px; }
+  .wrap { padding-left: 20px; padding-right: 20px; }
   .nav .wrap { gap: 12px; }
-  .hero { padding-top: 40px; }
-  .cases, .files, .never, .evs, .gate .checks { grid-template-columns: minmax(0, 1fr); }
-  .rail { margin-top: 56px; }
-  .ev time { font-size: 11px; }
-  .ev:nth-child(odd) time { bottom: auto; top: 22px; }
-  .gap { display: none; }
-  .labels { grid-template-columns: 1fr; gap: 12px; }
-  section.band { padding-top: 76px; }
-  .vs { grid-template-columns: 1fr; }
+  .field, .limits, .files, .steps { grid-template-columns: minmax(0, 1fr); }
+  .stamp { grid-template-columns: auto minmax(0, 1fr); }
+  .stamp a { grid-row: auto; grid-column: 1 / -1; margin-top: 6px; }
+  .facts div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .bars li { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .cell { padding: 20px 18px 22px; }
+  .figures div { padding: 22px 16px 24px 0; }
+  .figures div + div { padding-left: 16px; }
+  .figures div:nth-child(3) { padding-left: 0; }
+  .strip { gap: 3px; }
+  .band { padding: 60px 0; }
+}
+@media (max-width: 480px) {
+  .nav-links { display: none; }
+  .lang-switch { margin-left: auto; }
 }
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation: none !important; }
 }
 </style>
 </head>
 <body>
 <header class="nav"><div class="wrap">
-  <a class="brand" href="#top">CRM <span>pre-send QA</span></a>
+  <a class="brand" href="#top">Sender Domain Health</a>
   <nav class="nav-links" aria-label="Projects">
     <a class="proj" href="https://errer441122.github.io/ai-visibility-audit-geo/" data-i18n="nav_geo">GEO audit</a>
     <a class="proj" href="https://errer441122.github.io/ai-inbound-lead-router/" data-i18n="nav_lead">Lead router</a>
     <a class="proj" href="https://errer441122.github.io/cx-crm-promo-guard/" data-i18n="nav_cx">CX promo guard</a>
-    <a href="https://github.com/errer441122/lifecycle-automation-lab" data-i18n="nav_repo">GitHub repo</a>
+    <a href="https://github.com/errer441122/sender-domain-health" data-gh="" data-i18n="nav_repo">GitHub repo</a>
   </nav>
   <div class="lang-switch" role="group" aria-label="Language">
     <button type="button" data-lang="en" aria-pressed="true">EN</button>
@@ -265,162 +278,112 @@ footer a:hover { color: var(--accent); }
 </div></header>
 
 <main id="top">
-  <section class="wrap hero">
+  <section class="hero-band"><div class="wrap hero">
     <div>
-      <p class="eyebrow">Klaviyo + Shopify + n8n</p>
-      <h1 data-i18n="hero_h1">Catch broken emails before they ship.</h1>
-      <p class="lede" data-i18n="hero_lede">An n8n gate checks every draft against store policy, with rules from Klaviyo, Shopify and DNS traps found in live tests.</p>
+      <h1 data-i18n="hero_h1">Your email depends on three DNS records.</h1>
+      <p class="lede" data-i18n="hero_lede">An n8n workflow reads SPF, DKIM and DMARC from public DNS, grades them with fixed rules and alerts on change.</p>
       <div class="ctas">
-        <a class="btn" href="#qa" data-i18n="cta_try">Try the QA gate</a>
-        <a class="btn ghost" id="dl" href="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/workflows/ai-email-preflight-qa.n8n.json" download="ai-email-preflight-qa.n8n.json" data-i18n="cta_dl">Download the workflow</a>
+        <a class="btn" id="dl" href="https://raw.githubusercontent.com/errer441122/sender-domain-health/main/workflows/sender-domain-health.n8n.json" download="sender-domain-health.n8n.json" data-i18n="cta_dl">Download the workflow</a>
+        <a class="btn ghost" href="#sample" data-i18n="cta_sample">See 20 real companies</a>
       </div>
     </div>
-    <figure class="hero-card" id="hero-card" aria-label="Example: a win-back draft the gate blocks">
-      <div class="mail" id="hero-mail"></div>
-      <figcaption class="stamp" id="hero-stamp"></figcaption>
-    </figure>
-  </section>
-
-  <section class="wrap band" id="qa">
-    <h2 data-i18n="qa_h2">Three drafts through the gate</h2>
-    <p class="sub2" data-i18n-html="qa_sub">The checks and the JSON verdict follow <code>prompts/email-policy-qa-prompt.md</code>; the Slack text comes from the workflow file. The drafts are examples.</p>
-    <div class="drafts" role="tablist" aria-label="Email drafts" id="tabs"></div>
-    <div class="qa" role="tabpanel" id="qa-panel" aria-live="polite">
-      <div><h3 data-i18n="qa_left">What the subscriber would get</h3><div class="mail" id="mail"></div></div>
-      <div><h3 data-i18n="qa_right">What the gate returns</h3><div id="result"></div></div>
-    </div>
-  </section>
-
-  <section class="wrap band" id="field">
-    <h2 data-i18n="field_h2">Four things that broke for real</h2>
-    <p class="sub2" data-i18n-html="field_sub">Found while authenticating <code>send.negozio-online.org</code> and running the flows. Logs and screenshots are from <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">the field notes</a>.</p>
-    <div class="cases">
-      <article class="case">
-        <h3 data-i18n="c1_h3">Smart Sending ate the first cart email</h3>
-        <p data-i18n="c1_p">A welcome email had gone out under five hours earlier, so Klaviyo skipped email 2.1. No error, no alert: one screen says why.</p>
-        <pre class="term"><span class="d">17:47</span>  Received Email   "Benvenuto in Torrefazione Nord"
-<span class="d">18:45</span>  Checkout Started
-<span class="d">22:45</span>  2.1 due  ->  Delivered 0, Skipped 1
-       <span class="hl">"Skipped: Smart Sending (1)"</span></pre>
-        <button type="button" class="thumb" data-full="assets/flow-abandoned-cart.png" aria-label="Enlarge the Klaviyo abandoned cart flow"><img src="assets/flow-abandoned-cart.png" alt="The live Klaviyo abandoned cart flow: wait 4 hours, email 2.1, wait 20 hours, email 2.2, wait 2 days, email 2.3" loading="lazy" width="1800" height="1067" style="transform:scale(2.4);transform-origin:56% 36%"></button>
-        <p class="rule" data-i18n-html="c1_rule"><b>Rule:</b> Smart Sending off on abandoned cart, on for newsletters.</p>
-      </article>
-      <article class="case">
-        <h3 data-i18n="c2_h3">Double opt-in did not protect the list</h3>
-        <p data-i18n="c2_p">A sign-up through Shopify's newsletter field landed as subscribed 86 milliseconds after the webhook. No confirmation email was ever sent.</p>
-        <pre class="term">consent            <span class="hl">SUBSCRIBED</span>
-method             SHOPIFY / Customer Webhook
-webhook event      <span class="d">15:30:36.569</span>
-consent_timestamp  <span class="d">15:30:36.655</span></pre>
-        <button type="button" class="thumb" data-full="assets/klaviyo-double-optin.png" aria-label="Enlarge the Klaviyo list settings"><img src="assets/klaviyo-double-optin.png" alt="Klaviyo list settings with double opt-in selected" loading="lazy" width="1800" height="810" style="transform:scale(1.9);transform-origin:56% 42%"></button>
-        <p class="rule" data-i18n-html="c2_rule"><b>Rule:</b> keep consent source and timestamp on every profile (GDPR art. 7(1)) and audit for single opt-in leaks.</p>
-      </article>
-      <article class="case">
-        <h3 data-i18n="c3_h3">A green "Verified" was someone else's wildcard</h3>
-        <p data-i18n-html="c3_p">The first domain was parked on Afternic, whose zone answers every TXT query. Klaviyo asked for <code>_dmarc</code>, the wildcard replied and the check went green.</p>
-        <pre class="term"><span class="d">$</span> nslookup -type=TXT mionegozio.com
-mionegozio.com          text = <span class="hl">"v=spf1 -all"</span>
-<span class="d">$</span> nslookup -type=TXT _dmarc.mionegozio.com
-_dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
-        <button type="button" class="thumb" data-full="assets/dns-auth.png" aria-label="Enlarge the DNS lookups for the real sending domain"><img src="assets/dns-auth.png" alt="nslookup output for send.negozio-online.org: Klaviyo nameservers, DKIM CNAME and DMARC record" loading="lazy" width="1018" height="430"></button>
-        <p class="rule" data-i18n-html="c3_rule"><b>Rule:</b> verify SPF, DKIM and DMARC in public DNS, never on a dashboard tick.</p>
-      </article>
-      <article class="case tint">
-        <h3 data-i18n="c4_h3">Good copy promised what the store cannot do</h3>
-        <p data-i18n="c4_p">Drafts passed a manual read while promising shipping times and a coupon expiry the store does not offer.</p>
-        <div class="vs">
-          <div><small data-i18n="vs_draft">the draft said</small><s>"spedizione garantita in 48 ore"</s></div>
-          <div><small data-i18n="vs_policy">store policy says</small><code>published_shipping_sla: null</code></div>
-          <div><small data-i18n="vs_draft">the draft said</small><s>"valido solo 14 giorni"</s></div>
-          <div><small data-i18n="vs_policy">store policy says</small><code>supports_per_recipient_expiry: false</code></div>
+    <div class="hero-card" id="check">
+      <form class="checker" id="checker" novalidate>
+        <label for="dom" data-i18n="f_label">Domain or email address</label>
+        <div class="field">
+          <input id="dom" name="domain" type="text" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="company.com" aria-describedby="dom-help dom-err">
+          <button class="btn" type="submit" id="go" data-i18n="f_btn">Check</button>
         </div>
-        <p class="rule" data-i18n-html="c4_rule"><b>Rule:</b> every draft goes through the <a href="#qa">pre-send gate</a> against <code>config/store-facts-and-promo-policy.json</code>.</p>
-      </article>
-    </div>
-  </section>
-
-  <section class="wrap band" id="run">
-    <p class="eyebrow" data-i18n="run_eye">31 August 2026, one subscriber</p>
-    <h2 data-i18n="run_h2">From a profile property to an inbox in 17 minutes</h2>
-    <p class="sub2" data-i18n="run_sub">A sync script from an earlier version of this lab wrote the lifecycle stage to the Klaviyo profile. Klaviyo only reads the property, and the win-back flow fires. The run is documented in the field notes.</p>
-    <div class="run">
-      <div class="rail" aria-hidden="true">
-        <span class="ev first" style="left:0%"><time>12:55:00</time></span>
-        <span class="gap" style="left:30.8%">12m 37s</span>
-        <span class="ev" style="left:61.7%"><time>13:07:37</time></span>
-        <span class="gap" style="left:72%">4m 12s</span>
-        <span class="ev" style="left:82.3%"><time>13:11:49</time></span>
-        <span class="gap" style="left:91.1%">3m 38s</span>
-        <span class="ev last" style="left:100%"><time>13:15:27</time></span>
-      </div>
-      <div class="evs">
-        <div data-i18n-html="ev1"><b>Sync writes the stage</b><p><code>lifecycle_stage = "At risk"</code> on the profile, only because consent was on record.</p></div>
-        <div data-i18n-html="ev2"><b>Segment picks it up</b><p>"At risk (lifecycle_stage)" re-indexes: 1 profile.</p></div>
-        <div data-i18n-html="ev3"><b>Win-back 3.1 delivered</b><p>"E passato un po. Il tuo caffe ti aspetta".</p></div>
-        <div data-i18n-html="ev4"><b>Opened</b><p>One open, on a real client. A count, not a rate.</p></div>
-      </div>
-      <p class="small" data-i18n="run_note">The sync ran with the reference date pinned to 15 December, so the August order counted as 107 days old; the field notes disclose it. The segment delay varies between runs and is not a constant.</p>
-    </div>
-  </section>
-
-  <section class="wrap band" id="margin">
-    <h2 data-i18n="margin_h2">Who gets a discount, by days since the last order</h2>
-    <p class="sub2" data-i18n-html="margin_sub">From <code>docs/vip-margin-protection-rules.md</code>. A blanket discount is mostly paid by customers who would have bought at full price.</p>
-    <div class="ruler">
-      <div class="band-row" aria-hidden="true"><div class="zone"></div><div class="zone"></div><div class="zone yes"></div><div class="zone yes"></div><div class="zone sunset"></div></div>
-      <div class="days" aria-hidden="true"><span>0</span><span>15</span><span>91</span><span>181</span><span>365+</span></div>
-      <div class="labels">
-        <div data-i18n-html="lbl1"><b>Recent buyer</b>0-14 days. Post-purchase care, no coupon.</div>
-        <div data-i18n-html="lbl2"><b>New buyer</b>15-90 days. A nudge first, offers only after day 90.</div>
-        <div class="y" data-i18n-html="lbl3"><b>At risk</b>91-180 days. One win-back offer, <code>TORNA15</code>, once.</div>
-        <div class="y" data-i18n-html="lbl4"><b>Dormant</b>181-365 days. One final offer, then sunset.</div>
-        <div data-i18n-html="lbl5"><b>Unengaged</b>Over 365 days. Suppressed to protect the sender.</div>
-      </div>
-      <div class="never">
-        <h3 data-i18n="never_h3">Never, whatever the date</h3>
-        <div>
-          <ul>
-            <li data-i18n-html="never_1"><b>VIP and Champions:</b> 3 or more orders, or the top 20% by spend.</li>
-            <li data-i18n-html="never_2"><b>Full-price repeat buyers:</b> 2 or more orders, never used a coupon.</li>
-            <li data-i18n-html="never_3"><b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>.</li>
-          </ul>
-          <pre class="seg-def" data-i18n="seg_def">Klaviyo segment "Exclusion: Protect Full-Price Margin"
-  Placed Order at least 3 times over all time
-  OR Placed Order at least once in the last 14 days
-
-Also under "Don't send to": segment "CX hold active"</pre>
+        <p class="err" id="dom-err" role="alert" hidden></p>
+        <p class="help" id="dom-help" data-i18n="f_help">Looked up from your browser on Google Public DNS. Nothing is stored.</p>
+        <details class="adv">
+          <summary data-i18n="f_sel">DKIM selector (optional)</summary>
+          <div class="inner">
+            <input id="sel" name="selector" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="s1, s2" aria-label="DKIM selector" aria-describedby="sel-help">
+            <p class="help" id="sel-help" data-i18n="f_sel_help">The s= value in the DKIM-Signature header of a real email, for example s1 or google.</p>
+          </div>
+        </details>
+        <div class="chips"><span data-i18n="f_try">Try:</span>
+          <button type="button" class="chip" data-d="negozio-online.org">negozio-online.org</button>
+          <button type="button" class="chip" data-d="send.negozio-online.org" data-s="s1, s2">send.negozio-online.org</button>
+          <button type="button" class="chip" data-d="mionegozio.com">mionegozio.com</button>
         </div>
+      </form>
+      <div class="stamp busy" id="stamp" aria-live="polite"><b>&nbsp;</b><span class="dom"></span><span class="meta"></span></div>
+    </div>
+  </div></section>
+
+  <section class="figures-band" id="figures-band" aria-label="Key figures"><div class="wrap figures" id="figures">
+    <div><b>&nbsp;</b><span>&nbsp;</span></div><div><b>&nbsp;</b><span>&nbsp;</span></div><div><b>&nbsp;</b><span>&nbsp;</span></div><div><b>&nbsp;</b><span>&nbsp;</span></div>
+  </div></section>
+
+  <section class="band" id="verdict"><div class="wrap">
+    <h2><span data-i18n="v_h2">The verdict for</span> <span id="v-dom"></span></h2>
+    <p class="sub2" data-i18n="v_sub">The output of the workflow's two code nodes, running in your browser against live DNS. No AI is involved.</p>
+    <div class="vgrid">
+      <div id="findings" aria-live="polite"></div>
+      <div id="facts"></div>
+    </div>
+  </div></section>
+
+  <section class="band alt" id="story"><div class="wrap">
+    <h2 data-i18n="story_h2">A green tick that was someone else's wildcard</h2>
+    <div class="story">
+      <div>
+        <p data-i18n-html="story_p1">My first sending domain was parked on Afternic, whose zone answers every TXT question with the same line. The email tool asked for <code>_dmarc</code>, the wildcard replied, and the dashboard showed Verified. Nothing had been configured.</p>
+        <pre class="term"><span class="d">$ nslookup -type=TXT mionegozio.com</span>
+mionegozio.com          text = "v=spf1 -all"
+<span class="d">$ nslookup -type=TXT _dmarc.mionegozio.com</span>
+_dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span>      <span class="d"># identical</span></pre>
+        <p class="rule" data-i18n="story_rule">Since then I read the records in public DNS, never on a dashboard tick. This workflow is that habit, automated.</p>
+        <button type="button" class="btn ghost" id="trap" data-i18n="story_btn">Run the trap live</button>
       </div>
+      <figure>
+        <button type="button" class="thumb" data-full="assets/dns-auth.png"><img src="assets/dns-auth.png" width="1018" height="430" loading="lazy" alt="Terminal: nslookup of the NS, DKIM and DMARC records of send.negozio-online.org against 8.8.8.8, captured on 27 September 2026"></button>
+        <figcaption data-i18n="story_cap">The same check done by hand on my real sending domain, 27 September 2026.</figcaption>
+      </figure>
     </div>
-  </section>
+  </div></section>
 
-  <section class="wrap band" id="gate">
-    <h2 data-i18n="gate_h2">The gate itself</h2>
-    <p class="sub2" data-i18n="gate_sub">Code checks what has one right answer. The AI only reads the copy against the store's facts and the exclusions.</p>
-    <div class="gate">
-      <ol class="checks">
-        <li><div data-i18n-html="chk1"><b>Personalisation fallbacks<span class="by">rule</span></b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span></div></li>
-        <li><div data-i18n-html="chk2"><b>Links and GA4 UTMs<span class="by">rule</span></b><span>https links with lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code>.</span></div></li>
-        <li><div data-i18n-html="chk3"><b>Mobile and deliverability basics<span class="by">rule</span></b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span></div></li>
-        <li><div data-i18n-html="chk4"><b>Copy against store policy<span class="by ai">AI</span></b><span>No shipping times the checkout does not publish, no expiry on a static code.</span></div></li>
-        <li><div data-i18n-html="chk5"><b>Discount exclusions<span class="by ai">AI</span></b><span>VIPs, recent buyers and customers in CX hold active excluded whenever a discount appears.</span></div></li>
-      </ol>
-      <div class="graphbox"><div class="canvas" id="canvas"><p class="graph-msg" data-i18n="graph_loading">Loading the workflow file...</p></div></div>
-    </div>
-  </section>
+  <section class="band" id="sample"><div class="wrap">
+    <p class="eyebrow" data-i18n="sample_eye">21 November 2026, public DNS</p>
+    <h2 data-i18n="sample_h2">20 Italian B2B companies, same check</h2>
+    <p class="sub2" data-i18n="sample_sub">Six software and fourteen industrial companies, picked by hand and run through the workflow in n8n. All publish SPF and DMARC. The gaps are one level deeper.</p>
+    <div class="bento" id="bento"><p class="graph-msg" style="grid-column:1/-1" data-i18n="loading_data">Loading the sample...</p></div>
+    <p class="sample-note"><span data-i18n="sample_note">Names are withheld: the point is the method, and any domain can be checked at the top of this page. It is a hand-picked sample of well-known companies, not a market statistic.</span> <a href="https://github.com/errer441122/sender-domain-health/blob/main/data/italian-b2b-sample-2026-11-21.csv" data-gh="blob/main/data/italian-b2b-sample-2026-11-21.csv" data-i18n="sample_csv">Open the data (CSV)</a></p>
+  </div></section>
 
-  <section class="wrap band" id="files">
-    <h2 data-i18n="files_h2">The files</h2>
-    <div class="files">
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f1_d">The pre-send workflow and the standalone error-notifier.n8n.json, ready to import</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/config/store-facts-and-promo-policy.json"><span class="p">config/store-facts-and-promo-policy.json</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f2_d">The store's truth table the gate reads</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/prompts/email-policy-qa-prompt.md"><span class="p">prompts/email-policy-qa-prompt.md</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f3_d">What the AI checks, and what the rules check</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/vip-margin-protection-rules.md"><span class="p">docs/vip-margin-protection-rules.md</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f4_d">Who gets a discount and who does not</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/sop-pre-send-qa-checklist.md"><span class="p">docs/sop-pre-send-qa-checklist.md</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f5_d">One-page checklist before any send</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/tree/main/docs/field-notes"><span class="p">docs/field-notes/</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f6_d">The full Klaviyo, Shopify and DNS notes</span></a>
+  <section class="band alt" id="workflow"><div class="wrap">
+    <h2 data-i18n="wf_h2">What runs every Monday</h2>
+    <p class="sub2" data-i18n="wf_sub">Drawn from the workflow file. The two highlighted code nodes are the same ones the checker above runs.</p>
+    <div class="steps">
+      <div><b data-i18n="s1_b">Read</b><p data-i18n="s1_p">Public DNS for SPF, with every include followed, DMARC, MX and the DKIM selectors you list.</p></div>
+      <div><b data-i18n="s2_b">Grade</b><p data-i18n="s2_p">Fixed rules, no AI. Every finding comes with its meaning and its fix.</p></div>
+      <div><b data-i18n="s3_b">Compare</b><p data-i18n="s3_p">The last verdict of each domain is remembered, so a quiet week stays quiet.</p></div>
+      <div><b data-i18n="s4_b">Tell</b><p data-i18n="s4_p">A digest in Slack on every run. An alert only when a domain gets worse or its records change.</p></div>
     </div>
-    <p class="honest" data-i18n="honest">The Klaviyo account, the flows and the DNS records are real. They run on a Shopify development store with no real customers, which is why no open rates or revenue figures are claimed.</p>
-  </section>
+    <div class="graphbox"><div class="canvas" id="canvas"><p class="graph-msg" data-i18n="loading_wf">Loading the workflow file...</p></div></div>
+    <p class="ran" data-i18n="wf_ran">Run for real in n8n 2.48.7 on 21 November 2026, on 23 domains. The first run alerted on the 2 failing domains; the second found nothing changed and stayed silent. The Slack nodes were swapped for placeholders: no workspace was connected.</p>
+  </div></section>
+
+  <section class="band" id="limits"><div class="wrap">
+    <h2 data-i18n="lim_h2">What it cannot see</h2>
+    <ul class="limits">
+      <li data-i18n-html="l1"><b>Whether a message lands in the inbox.</b>DNS says who may send. Reputation, content and complaints decide the rest.</li>
+      <li data-i18n-html="l2"><b>DKIM keys without a selector.</b>A key is found only by its selector name, which you read from a real email.</li>
+      <li data-i18n-html="l3"><b>SPF on the return-path.</b>Email tools often send with their own hidden bounce address. The check reads the domain you type.</li>
+      <li data-i18n-html="l4"><b>Domains you did not list.</b>A tool sending from a subdomain nobody told you about stays invisible until DMARC reports show it.</li>
+    </ul>
+    <div class="files" id="files">
+      <a href="https://github.com/errer441122/sender-domain-health/blob/main/workflows/sender-domain-health.n8n.json" data-gh="blob/main/workflows/sender-domain-health.n8n.json"><span class="p">workflows/sender-domain-health.n8n.json</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="fl1">The workflow, ready to import. The checks need no credentials.</span></a>
+      <a href="https://github.com/errer441122/sender-domain-health/blob/main/docs/rules.md" data-gh="blob/main/docs/rules.md"><span class="p">docs/rules.md</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="fl2">Every rule in plain words: what it means and how to fix it</span></a>
+      <a href="https://github.com/errer441122/sender-domain-health/blob/main/data/own-domains-2026-11-21.json" data-gh="blob/main/data/own-domains-2026-11-21.json"><span class="p">data/own-domains-2026-11-21.json</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="fl3">Full verdicts for my own domains and the parked trap</span></a>
+      <a href="https://github.com/errer441122/sender-domain-health/blob/main/tests/workflow.test.mjs" data-gh="blob/main/tests/workflow.test.mjs"><span class="p">tests/workflow.test.mjs</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="fl4">The workflow's nodes tested against canned DNS answers</span></a>
+      <a href="https://github.com/errer441122/sender-domain-health/tree/main/docs/field-notes" data-gh="tree/main/docs/field-notes"><span class="p">docs/field-notes/</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="fl5">Where this started: a real Klaviyo and Shopify setup</span></a>
+      <a href="https://github.com/errer441122/sender-domain-health/blob/main/workflows/error-notifier.n8n.json" data-gh="blob/main/workflows/error-notifier.n8n.json"><span class="p">workflows/error-notifier.n8n.json</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="fl6">A failed run posts to #martech-alerts</span></a>
+    </div>
+    <p class="honest" data-i18n="honest">My own domain is one of the examples and it does not pass cleanly: DMARC is still in monitoring mode with no report address. Fixing that is the next entry in this repo.</p>
+  </div></section>
 </main>
 
 <dialog id="lightbox"><img id="lightbox-img" src="" alt=""><button type="button" id="lightbox-close" data-i18n="close">Close</button></dialog>
@@ -435,199 +398,186 @@ Also under "Don't send to": segment "CX hold active"</pre>
 </div></footer>
 
 <script>
-const BASE = location.hostname.endsWith("github.io")
-  ? "https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/"
-  : "../";
+// Works under any repository name: the name is read from the GitHub Pages path.
+const ON_PAGES = location.hostname.endsWith("github.io");
+const REPO = ON_PAGES ? location.pathname.split("/")[1] : "sender-domain-health";
+const BASE = ON_PAGES ? `https://raw.githubusercontent.com/errer441122/${REPO}/main/` : "../";
+const GH = `https://github.com/errer441122/${REPO}`;
+const WF_FILE = "workflows/sender-domain-health.n8n.json";
+const DEFAULT_DOMAIN = "negozio-online.org";
+const RUN_DOMAINS = 23; // domains in the real n8n run of 21 Nov 2026
 
 const I18N = {
   en: {
-    page_title: "CRM Pre-Send QA: live showcase",
-    nav_geo: "GEO audit",
-    nav_lead: "Lead router",
-    nav_cx: "CX promo guard",
-    nav_repo: "GitHub repo",
-    hero_h1: "Catch broken emails before they ship.",
-    hero_lede: "An n8n gate checks every draft against store policy, with rules from Klaviyo, Shopify and DNS traps found in live tests.",
-    cta_try: "Try the QA gate",
-    cta_dl: "Download the workflow",
-    hero_card_label: "Example: a win-back draft the gate blocks",
-    qa_h2: "Three drafts through the gate",
-    qa_sub: 'The checks and the JSON verdict follow <code>prompts/email-policy-qa-prompt.md</code>; the Slack text comes from the workflow file. The drafts are examples.',
-    qa_left: "What the subscriber would get",
-    qa_right: "What the gate returns",
-    field_h2: "Four things that broke for real",
-    field_sub: 'Found while authenticating <code>send.negozio-online.org</code> and running the flows. Logs and screenshots are from <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">the field notes</a>.',
-    c1_h3: "Smart Sending ate the first cart email",
-    c1_p: "A welcome email had gone out under five hours earlier, so Klaviyo skipped email 2.1. No error, no alert: one screen says why.",
-    c1_rule: "<b>Rule:</b> Smart Sending off on abandoned cart, on for newsletters.",
-    c2_h3: "Double opt-in did not protect the list",
-    c2_p: "A sign-up through Shopify's newsletter field landed as subscribed 86 milliseconds after the webhook. No confirmation email was ever sent.",
-    c2_rule: "<b>Rule:</b> keep consent source and timestamp on every profile (GDPR art. 7(1)) and audit for single opt-in leaks.",
-    c3_h3: 'A green "Verified" was someone else\'s wildcard',
-    c3_p: "The first domain was parked on Afternic, whose zone answers every TXT query. Klaviyo asked for <code>_dmarc</code>, the wildcard replied and the check went green.",
-    c3_rule: "<b>Rule:</b> verify SPF, DKIM and DMARC in public DNS, never on a dashboard tick.",
-    c4_h3: "Good copy promised what the store cannot do",
-    c4_p: "Drafts passed a manual read while promising shipping times and a coupon expiry the store does not offer.",
-    vs_draft: "the draft said",
-    vs_policy: "store policy says",
-    c4_rule: '<b>Rule:</b> every draft goes through the <a href="#qa">pre-send gate</a> against <code>config/store-facts-and-promo-policy.json</code>.',
-    run_eye: "31 August 2026, one subscriber",
-    run_h2: "From a profile property to an inbox in 17 minutes",
-    run_sub: "A sync script from an earlier version of this lab wrote the lifecycle stage to the Klaviyo profile. Klaviyo only reads the property, and the win-back flow fires. The run is documented in the field notes.",
-    ev1: '<b>Sync writes the stage</b><p><code>lifecycle_stage = "At risk"</code> on the profile, only because consent was on record.</p>',
-    ev2: '<b>Segment picks it up</b><p>"At risk (lifecycle_stage)" re-indexes: 1 profile.</p>',
-    ev3: '<b>Win-back 3.1 delivered</b><p>"E passato un po. Il tuo caffe ti aspetta".</p>',
-    ev4: "<b>Opened</b><p>One open, on a real client. A count, not a rate.</p>",
-    run_note: "The sync ran with the reference date pinned to 15 December, so the August order counted as 107 days old; the field notes disclose it. The segment delay varies between runs and is not a constant.",
-    margin_h2: "Who gets a discount, by days since the last order",
-    margin_sub: "From <code>docs/vip-margin-protection-rules.md</code>. A blanket discount is mostly paid by customers who would have bought at full price.",
-    lbl1: "<b>Recent buyer</b>0-14 days. Post-purchase care, no coupon.",
-    lbl2: "<b>New buyer</b>15-90 days. A nudge first, offers only after day 90.",
-    lbl3: "<b>At risk</b>91-180 days. One win-back offer, <code>TORNA15</code>, once.",
-    lbl4: "<b>Dormant</b>181-365 days. One final offer, then sunset.",
-    lbl5: "<b>Unengaged</b>Over 365 days. Suppressed to protect the sender.",
-    never_h3: "Never, whatever the date",
-    never_1: "<b>VIP and Champions:</b> 3 or more orders, or the top 20% by spend.",
-    never_2: "<b>Full-price repeat buyers:</b> 2 or more orders, never used a coupon.",
-    never_3: '<b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>.',
-    seg_def: 'Klaviyo segment "Exclusion: Protect Full-Price Margin"\n  Placed Order at least 3 times over all time\n  OR Placed Order at least once in the last 14 days\n\nAlso under "Don\'t send to": segment "CX hold active"',
-    gate_h2: "The gate itself",
-    gate_sub: "Code checks what has one right answer. The AI only reads the copy against the store's facts and the exclusions.",
-    chk1: '<b>Personalisation fallbacks<span class="by">rule</span></b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span>',
-    chk2: '<b>Links and GA4 UTMs<span class="by">rule</span></b><span>https links with lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code>.</span>',
-    chk3: '<b>Mobile and deliverability basics<span class="by">rule</span></b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span>',
-    chk4: '<b>Copy against store policy<span class="by ai">AI</span></b><span>No shipping times the checkout does not publish, no expiry on a static code.</span>',
-    chk5: '<b>Discount exclusions<span class="by ai">AI</span></b><span>VIPs, recent buyers and customers in CX hold active excluded whenever a discount appears.</span>',
-    graph_loading: "Loading the workflow file...",
-    graph_err: 'The workflow file did not load. <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json">Open it on GitHub</a>.',
-    files_h2: "The files",
+    page_title: "Sender Domain Health: live SPF, DKIM and DMARC check",
+    nav_geo: "GEO audit", nav_lead: "Lead router", nav_cx: "CX promo guard", nav_repo: "GitHub repo",
+    hero_h1: "Your email depends on three DNS records.",
+    hero_lede: "An n8n workflow reads SPF, DKIM and DMARC from public DNS, grades them with fixed rules and alerts on change.",
+    cta_dl: "Download the workflow", cta_sample: "See 20 real companies",
+    f_label: "Domain or email address", f_btn: "Check",
+    f_help: "Looked up from your browser on Google Public DNS. Nothing is stored.",
+    f_err: "That does not look like a domain. Try company.com.",
+    f_sel: "DKIM selector (optional)",
+    f_sel_help: "The s= value in the DKIM-Signature header of a real email, for example s1 or google.",
+    f_try: "Try:",
+    st_PASS: "Pass", st_WARN: "Warnings", st_FAIL: "Fail", st_ERROR: "No answer", st_BUSY: "Checking",
+    sum_busy: "Reading public DNS...", sum_live: "checked live at", sum_stored: "stored result of 21 Nov 2026",
+    sum_link: "Read the verdict", sum_fail: "Public DNS did not answer. Showing nothing rather than a guess: try again.",
+    engine_err: "The workflow file did not load, so the live check is off.",
+    blockers: ["blocker", "blockers"], warnings: ["warning", "warnings"], notes: ["note", "notes"],
+    v_h2: "The verdict for",
+    v_sub: "The output of the workflow's two code nodes, running in your browser against live DNS. No AI is involved.",
+    v_clean: "Nothing to fix: every check passed.",
+    means: "What it means:", fix: "Fix:",
+    fa_dmarc: "DMARC policy", fa_spf: "SPF lookups", fa_spf_val: "of 10 allowed", fa_mail: "Mailboxes run on",
+    fa_tools: "Allowed to send (from SPF)", fa_tools_none: "no known tool named", fa_other: "other", fa_none: "none",
+    fa_dkim: "DKIM selectors checked", fa_dkim_none: "none given", fa_records: "The records as published", rec_none: "(no record)",
+    stage_reject: "reject: fake email is refused", stage_quarantine: "quarantine: fake email goes to spam",
+    stage_monitoring: "monitoring only: nothing is blocked", stage_missing: "missing", stage_invalid: "not valid", stage_unknown: "unknown",
+    story_h2: "A green tick that was someone else's wildcard",
+    story_p1: "My first sending domain was parked on Afternic, whose zone answers every TXT question with the same line. The email tool asked for <code>_dmarc</code>, the wildcard replied, and the dashboard showed Verified. Nothing had been configured.",
+    story_rule: "Since then I read the records in public DNS, never on a dashboard tick. This workflow is that habit, automated.",
+    story_btn: "Run the trap live",
+    story_cap: "The same check done by hand on my real sending domain, 27 September 2026.",
+    sample_eye: "21 November 2026, public DNS",
+    sample_h2: "20 Italian B2B companies, same check",
+    sample_sub: "Six software and fourteen industrial companies, picked by hand and run through the workflow in n8n. All publish SPF and DMARC. The gaps are one level deeper.",
+    of: "of", take_dmarc: "stop at monitoring. Fake email in their name is still delivered.",
+    fig_n: "Italian B2B companies checked", fig_mon: "publish DMARC but only monitor it", fig_spf: "at or past the SPF lookup limit", fig_run: "real domains run through n8n",
+    ch_dmarc_h: "DMARC policy",
+    row_reject: "reject: fake email refused", row_quarantine: "quarantine: fake email to spam", row_monitoring: "monitoring only (p=none)", row_missing: "no DMARC record",
+    ch_spf_h: "SPF lookups per company",
+    ch_spf_p: "Each square is one company, placed on its number of DNS lookups. Past 10, SPF stops working.",
+    lg_over: "past the limit", lg_near: "at 9 or 10: one tool away", lg_ok: "8 or fewer", lg_limit: "the limit of 10",
+    ch_tools_h: "What their SPF says they send with",
+    ch_tools_p: "An SPF record is a public list of a company's email tools.",
+    ch_mail_h: "Who filters their inbound email", other: "other",
+    companies: ["company", "companies"],
+    sample_note: "Names are withheld: the point is the method, and any domain can be checked at the top of this page. It is a hand-picked sample of well-known companies, not a market statistic.",
+    sample_csv: "Open the data (CSV)", loading_data: "Loading the sample...", data_err: "The sample file did not load.",
+    wf_h2: "What runs every Monday",
+    wf_sub: "Drawn from the workflow file. The two highlighted code nodes are the same ones the checker above runs.",
+    s1_b: "Read", s1_p: "Public DNS for SPF, with every include followed, DMARC, MX and the DKIM selectors you list.",
+    s2_b: "Grade", s2_p: "Fixed rules, no AI. Every finding comes with its meaning and its fix.",
+    s3_b: "Compare", s3_p: "The last verdict of each domain is remembered, so a quiet week stays quiet.",
+    s4_b: "Tell", s4_p: "A digest in Slack on every run. An alert only when a domain gets worse or its records change.",
+    loading_wf: "Loading the workflow file...", graph_err: "The workflow file did not load.", yes: "yes", no: "no",
+    k_scheduleTrigger: "schedule", k_manualTrigger: "manual", k_code: "code, no ai", k_if: "if", k_slack: "slack",
+    wf_ran: "Run for real in n8n 2.48.7 on 21 November 2026, on 23 domains. The first run alerted on the 2 failing domains; the second found nothing changed and stayed silent. The Slack nodes were swapped for placeholders: no workspace was connected.",
+    lim_h2: "What it cannot see",
+    l1: "<b>Whether a message lands in the inbox.</b>DNS says who may send. Reputation, content and complaints decide the rest.",
+    l2: "<b>DKIM keys without a selector.</b>A key is found only by its selector name, which you read from a real email.",
+    l3: "<b>SPF on the return-path.</b>Email tools often send with their own hidden bounce address. The check reads the domain you type.",
+    l4: "<b>Domains you did not list.</b>A tool sending from a subdomain nobody told you about stays invisible until DMARC reports show it.",
     open: "open",
-    f1_d: "The pre-send workflow and the standalone error-notifier.n8n.json, ready to import",
-    f2_d: "The store's truth table the gate reads",
-    f3_d: "What the AI checks, and what the rules check",
-    f4_d: "Who gets a discount and who does not",
-    f5_d: "One-page checklist before any send",
-    f6_d: "The full Klaviyo, Shopify and DNS notes",
-    honest: "The Klaviyo account, the flows and the DNS records are real. They run on a Shopify development store with no real customers, which is why no open rates or revenue figures are claimed.",
+    fl1: "The workflow, ready to import. The checks need no credentials.",
+    fl2: "Every rule in plain words: what it means and how to fix it",
+    fl3: "Full verdicts for my own domains and the parked trap",
+    fl4: "The workflow's nodes tested against canned DNS answers",
+    fl5: "Where this started: a real Klaviyo and Shopify setup",
+    fl6: "A failed run posts to #martech-alerts",
+    honest: "My own domain is one of the examples and it does not pass cleanly: DMARC is still in monitoring mode with no report address. Fixing that is the next entry in this repo.",
     close: "Close",
-    by_rule: "rule",
-    lbl_from: "From",
-    lbl_subject: "Subject",
-    lbl_preview: "Preview",
-    lbl_chars: "characters",
-    lbl_phone_cut: ", a phone shows about 50",
-    lbl_empty: "(empty)",
-    lbl_sent_to: "Sent to",
-    lbl_excluded: "Excluded",
-    lbl_missing: ": missing",
-    verdict_pass: "PASS",
-    verdict_fail: "FAIL",
-    tag_blocker: "blocker",
-    tag_warning: "warning",
-    lbl_fix: "Fix:",
-    clean_msg: "No blockers and no warnings. The discount reaches only At risk customers, with the margin and CX-hold exclusions attached.",
-    note_pass: "PASS still means a live seed-inbox check before scheduling.",
-    note_fail: "Blockers stop the send: the draft goes back with the fix list.",
-    edge_pass: "pass",
-    edge_fail: "fail",
-    kind_ai: "ai call",
-    kind_err: "on error",
-    kind_code: "code",
   },
   it: {
-    page_title: "QA Pre-Invio Email CRM: showcase interattivo",
-    nav_geo: "Audit GEO",
-    nav_lead: "Router lead",
-    nav_cx: "Blocco promo CX",
-    nav_repo: "Repo GitHub",
-    hero_h1: "Ferma le email sbagliate prima dell'invio.",
-    hero_lede: "Un controllo automatico su n8n verifica ogni bozza rispetto alle regole del negozio, nato da errori reali di Klaviyo, Shopify e DNS trovati nei test dal vivo.",
-    cta_try: "Prova il controllo QA",
-    cta_dl: "Scarica il workflow",
-    hero_card_label: "Esempio: una bozza win-back bloccata dal controllo",
-    qa_h2: "Tre bozze passate al controllo",
-    qa_sub: 'I controlli e il verdetto seguono <code>prompts/email-policy-qa-prompt.md</code>; il messaggio Slack arriva direttamente dal file del workflow. Le bozze qui sotto sono esempi dimostrativi.',
-    qa_left: "Cosa riceverebbe il cliente",
-    qa_right: "Cosa risponde il controllo",
-    field_h2: "Quattro cose che si sono rotte davvero",
-    field_sub: 'Scoperte durante l\'autenticazione di <code>send.negozio-online.org</code> e i test reali dei flussi. Log e screenshot arrivano dalle <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">note operative sul campo</a>.',
-    c1_h3: "Lo Smart Sending ha bloccato la prima email carrello",
-    c1_p: "Meno di cinque ore prima era partita un'email di benvenuto, quindi Klaviyo ha saltato l'email 2.1 del carrello abbandonato. Nessun errore, nessun avviso: lo si scopre solo in una schermata.",
-    c1_rule: "<b>Regola:</b> Smart Sending disattivato sul carrello abbandonato, attivo sulle newsletter.",
-    c2_h3: "Il double opt-in non ha protetto davvero la lista",
-    c2_p: "Un'iscrizione dal campo newsletter di Shopify è risultata attiva appena 86 millisecondi dopo il webhook, senza che partisse alcuna email di conferma.",
-    c2_rule: "<b>Regola:</b> salvare fonte e data/ora del consenso su ogni profilo (GDPR art. 7(1)) e controllare eventuali ingressi in single opt-in.",
-    c3_h3: 'Una spunta verde "Verificato" era un falso positivo DNS',
-    c3_p: "Il primo dominio era parcheggiato su Afternic, che risponde automaticamente a qualunque richiesta TXT. Klaviyo ha cercato <code>_dmarc</code>, il record jolly ha risposto e la verifica è diventata verde per sbaglio.",
-    c3_rule: "<b>Regola:</b> verificare sempre SPF, DKIM e DMARC nei DNS pubblici, mai fidarsi solo della spunta in dashboard.",
-    c4_h3: "Un buon testo prometteva cose che il negozio non fa",
-    c4_p: "Bozze che a occhio sembravano ottime promettevano tempi di consegna e scadenze coupon che il negozio non garantisce.",
-    vs_draft: "la bozza diceva",
-    vs_policy: "la policy del negozio dice",
-    c4_rule: '<b>Regola:</b> ogni bozza passa dal <a href="#qa">controllo pre-invio</a> confrontata con <code>config/store-facts-and-promo-policy.json</code>.',
-    run_eye: "31 agosto 2026, un iscritto reale",
-    run_h2: "Da una proprietà sul profilo alla casella email in 17 minuti",
-    run_sub: "Uno script di test della prima versione del laboratorio ha aggiornato lo stato del cliente sul profilo Klaviyo. Klaviyo legge solo quella proprietà e fa partire in automatico il flusso Win-Back. Il test è documentato nelle note sul campo.",
-    ev1: '<b>Aggiornamento stato</b><p>Impostato <code>lifecycle_stage = "At risk"</code> sul profilo, solo perché risultava un consenso valido.</p>',
-    ev2: '<b>Il segmento lo rileva</b><p>Il segmento "At risk (lifecycle_stage)" si aggiorna: 1 profilo trovato.</p>',
-    ev3: '<b>Email Win-Back 3.1 consegnata</b><p>"È passato un po\'. Il tuo caffè ti aspetta".</p>',
-    ev4: "<b>Aperta</b><p>Una singola apertura su una casella reale. Un conteggio verificato, non una percentuale gonfiata.</p>",
-    run_note: "Il test ha simulato la data del 15 dicembre così da far risultare l'ordine di agosto vecchio di 107 giorni (tutto dichiarato nelle note). Il tempo di aggiornamento del segmento varia da un test all'altro.",
-    margin_h2: "Chi riceve uno sconto, in base ai giorni dall'ultimo ordine",
-    margin_sub: "Da <code>docs/vip-margin-protection-rules.md</code>. Uno sconto inviato a tutti finisce soprattutto a clienti che avrebbero comprato comunque a prezzo pieno.",
-    lbl1: "<b>Acquirente recente</b>0-14 giorni. Solo cura post-acquisto, nessun coupon.",
-    lbl2: "<b>Nuovo acquirente</b>15-90 giorni. Prima un promemoria gentile, sconti solo dopo il 90° giorno.",
-    lbl3: "<b>A rischio</b>91-180 giorni. Una sola offerta di recupero, <code>TORNA15</code>, una volta sola.",
-    lbl4: "<b>Inattivo</b>181-365 giorni. Un'ultima proposta, poi stop agli invii.",
-    lbl5: "<b>Disinteressato</b>Oltre 365 giorni. Escluso per proteggere la reputazione del dominio.",
-    never_h3: "Mai scontati, qualunque sia la data",
-    never_1: "<b>VIP e clienti migliori:</b> 3 o più ordini, oppure il 20% che spende di più.",
-    never_2: "<b>Clienti abituali a prezzo pieno:</b> 2 o più ordini senza aver mai usato un coupon.",
-    never_3: '<b>Blocco assistenza attivo (CX hold):</b> pacco bloccato, recensione 1-2 stelle o ticket aperto, gestito da <a href="https://errer441122.github.io/cx-crm-promo-guard/">Blocco promo CX</a>.',
-    seg_def: 'Segmento Klaviyo "Exclusion: Protect Full-Price Margin"\n  Ordine completato almeno 3 volte in totale\n  OPPURE Ordine completato almeno 1 volta negli ultimi 14 giorni\n\nInoltre sotto "Non inviare a": segmento "CX hold active"',
-    gate_h2: "Come funziona il controllo",
-    gate_sub: "Le regole fisse verificano ciò che ha una sola risposta esatta. L'AI legge il testo solo per confrontarlo con le regole del negozio e le esclusioni.",
-    chk1: '<b>Tag di personalizzazione<span class="by">regola</span></b><span>Segnaposto Klaviyo o HubSpot senza testo di riserva (che generano "Ciao ,").</span>',
-    chk2: '<b>Link e parametri UTM GA4<span class="by">regola</span></b><span>Link HTTPS con <code>utm_source</code>, <code>utm_medium=email</code> e <code>utm_campaign</code> in minuscolo.</span>',
-    chk3: '<b>Leggibilità mobile e recapito<span class="by">regola</span></b><span>Oggetto entro 50 caratteri, testo di anteprima utile, link di disiscrizione e testo alternativo immagini.</span>',
-    chk4: '<b>Testo rispetto alle policy<span class="by ai">AI</span></b><span>Nessuna consegna promessa se non garantita dal negozio, nessuna scadenza finta su codici fissi.</span>',
-    chk5: '<b>Esclusioni sugli sconti<span class="by ai">AI</span></b><span>VIP, acquirenti recenti e clienti con blocco assistenza esclusi ogni volta che c\'è un coupon.</span>',
-    graph_loading: "Caricamento del file workflow...",
-    graph_err: 'Impossibile caricare il file workflow. <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json">Aprilo su GitHub</a>.',
-    files_h2: "I file del progetto",
+    page_title: "Sender Domain Health: controllo live di SPF, DKIM e DMARC",
+    nav_geo: "Audit GEO", nav_lead: "Lead router", nav_cx: "CX promo guard", nav_repo: "Repo GitHub",
+    hero_h1: "Le email dipendono da tre record DNS.",
+    hero_lede: "Un workflow n8n legge SPF, DKIM e DMARC dal DNS pubblico, li valuta con regole fisse e avvisa quando cambiano.",
+    cta_dl: "Scarica il workflow", cta_sample: "Guarda 20 aziende reali",
+    f_label: "Dominio o indirizzo email", f_btn: "Controlla",
+    f_help: "La ricerca parte dal tuo browser verso Google Public DNS. Non viene salvato nulla.",
+    f_err: "Non sembra un dominio. Prova con azienda.it.",
+    f_sel: "Selettore DKIM (facoltativo)",
+    f_sel_help: "Il valore s= nell'intestazione DKIM-Signature di un'email vera, per esempio s1 o google.",
+    f_try: "Prova:",
+    st_PASS: "Superato", st_WARN: "Avvisi", st_FAIL: "Non superato", st_ERROR: "Nessuna risposta", st_BUSY: "Controllo",
+    sum_busy: "Leggo il DNS pubblico...", sum_live: "controllato dal vivo alle", sum_stored: "risultato salvato il 21 nov 2026",
+    sum_link: "Leggi l'esito", sum_fail: "Il DNS pubblico non ha risposto. Meglio nessun esito che uno inventato: riprova.",
+    engine_err: "Il file del workflow non si è caricato, quindi il controllo dal vivo è spento.",
+    blockers: ["errore bloccante", "errori bloccanti"], warnings: ["avviso", "avvisi"], notes: ["nota", "note"],
+    v_h2: "L'esito per",
+    v_sub: "È l'output dei due nodi di codice del workflow, eseguiti nel tuo browser sul DNS reale. Nessuna AI.",
+    v_clean: "Niente da correggere: tutti i controlli sono superati.",
+    means: "Cosa significa:", fix: "Come si corregge:",
+    fa_dmarc: "Regola DMARC", fa_spf: "Ricerche SPF", fa_spf_val: "su 10 consentite", fa_mail: "Caselle di posta su",
+    fa_tools: "Autorizzati a inviare (dall'SPF)", fa_tools_none: "nessuno strumento riconosciuto", fa_other: "altri", fa_none: "nessuno",
+    fa_dkim: "Selettori DKIM controllati", fa_dkim_none: "nessuno indicato", fa_records: "I record come sono pubblicati", rec_none: "(nessun record)",
+    stage_reject: "reject: le email false vengono rifiutate", stage_quarantine: "quarantine: le email false vanno nello spam",
+    stage_monitoring: "sola osservazione: non viene bloccato nulla", stage_missing: "assente", stage_invalid: "non valida", stage_unknown: "sconosciuta",
+    story_h2: "Una spunta verde che era il record jolly di un altro",
+    story_p1: "Il mio primo dominio di invio era parcheggiato su Afternic, la cui zona risponde a ogni domanda TXT con la stessa riga. Lo strumento di invio ha chiesto <code>_dmarc</code>, il record jolly ha risposto e il pannello ha mostrato Verificato. Non era configurato nulla.",
+    story_rule: "Da allora leggo i record nel DNS pubblico, mai sulla spunta di un pannello. Questo workflow è quell'abitudine, automatizzata.",
+    story_btn: "Prova la trappola dal vivo",
+    story_cap: "Lo stesso controllo fatto a mano sul mio vero dominio di invio, 27 settembre 2026.",
+    sample_eye: "21 novembre 2026, DNS pubblico",
+    sample_h2: "20 aziende B2B italiane, stesso controllo",
+    sample_sub: "Sei aziende software e quattordici industriali, scelte a mano e passate nel workflow in n8n. Tutte pubblicano SPF e DMARC. I problemi sono un livello più sotto.",
+    of: "su", take_dmarc: "si fermano all'osservazione. Le email false a loro nome vengono comunque consegnate.",
+    fig_n: "aziende B2B italiane controllate", fig_mon: "pubblicano il DMARC ma si limitano a osservare", fig_spf: "al limite di ricerche SPF, o oltre", fig_run: "domini reali eseguiti in n8n",
+    ch_dmarc_h: "Regola DMARC",
+    row_reject: "reject: email false rifiutate", row_quarantine: "quarantine: email false nello spam", row_monitoring: "sola osservazione (p=none)", row_missing: "nessun record DMARC",
+    ch_spf_h: "Ricerche SPF per azienda",
+    ch_spf_p: "Ogni quadrato è un'azienda, posizionata sul suo numero di ricerche DNS. Oltre 10 l'SPF smette di funzionare.",
+    lg_over: "oltre il limite", lg_near: "a 9 o 10: manca uno strumento", lg_ok: "8 o meno", lg_limit: "il limite di 10",
+    ch_tools_h: "Con cosa inviano, secondo il loro SPF",
+    ch_tools_p: "Un record SPF è un elenco pubblico degli strumenti email di un'azienda.",
+    ch_mail_h: "Chi filtra la loro posta in arrivo", other: "altro",
+    companies: ["azienda", "aziende"],
+    sample_note: "I nomi non sono pubblicati: conta il metodo, e qualsiasi dominio si può controllare in cima a questa pagina. È un campione di aziende note scelto a mano, non una statistica di mercato.",
+    sample_csv: "Apri i dati (CSV)", loading_data: "Carico il campione...", data_err: "Il file del campione non si è caricato.",
+    wf_h2: "Cosa gira ogni lunedì",
+    wf_sub: "Disegnato dal file del workflow. I due nodi di codice evidenziati sono gli stessi che usa il controllo qui sopra.",
+    s1_b: "Legge", s1_p: "Il DNS pubblico: SPF seguendo ogni include, DMARC, MX e i selettori DKIM che indichi.",
+    s2_b: "Valuta", s2_p: "Regole fisse, nessuna AI. Ogni problema arriva con il suo significato e la sua correzione.",
+    s3_b: "Confronta", s3_p: "Ricorda l'ultimo esito di ogni dominio, così una settimana tranquilla resta silenziosa.",
+    s4_b: "Avvisa", s4_p: "Un riepilogo su Slack a ogni esecuzione. Un allarme solo se un dominio peggiora o i suoi record cambiano.",
+    loading_wf: "Carico il file del workflow...", graph_err: "Il file del workflow non si è caricato.", yes: "sì", no: "no",
+    k_scheduleTrigger: "pianificato", k_manualTrigger: "manuale", k_code: "codice, no ai", k_if: "se", k_slack: "slack",
+    wf_ran: "Eseguito davvero in n8n 2.48.7 il 21 novembre 2026, su 23 domini. La prima esecuzione ha dato l'allarme sui 2 domini non superati; la seconda non ha trovato cambiamenti ed è rimasta in silenzio. I nodi Slack erano sostituiti da segnaposto: nessun workspace collegato.",
+    lim_h2: "Cosa non può vedere",
+    l1: "<b>Se un messaggio arriva nella posta in arrivo.</b>Il DNS dice chi può inviare. Reputazione, contenuto e segnalazioni decidono il resto.",
+    l2: "<b>Le chiavi DKIM senza selettore.</b>Una chiave si trova solo conoscendo il nome del selettore, che si legge in un'email vera.",
+    l3: "<b>L'SPF sull'indirizzo di ritorno.</b>Gli strumenti di invio usano spesso un loro indirizzo nascosto per i rimbalzi. Il controllo legge il dominio che scrivi.",
+    l4: "<b>I domini che non hai elencato.</b>Uno strumento che invia da un sottodominio di cui nessuno ti ha parlato resta invisibile finché non compare nei report DMARC.",
     open: "apri",
-    f1_d: "Il workflow di controllo pre-invio e il gestore errori separato error-notifier.n8n.json, pronti da importare",
-    f2_d: "La scheda ufficiale delle regole del negozio letta dal controllo",
-    f3_d: "Cosa controlla l'AI e cosa controllano le regole fisse",
-    f4_d: "Chi può ricevere uno sconto e chi viene sempre escluso",
-    f5_d: "Checklist operativa di una pagina prima di ogni invio",
-    f6_d: "Tutte le note complete sui test Klaviyo, Shopify e DNS",
-    honest: "L'account Klaviyo, i flussi e i record DNS sono reali. Girano su un negozio Shopify di test senza clienti veri, ed è per questo che non vengono dichiarati tassi di apertura o ricavi inventati.",
+    fl1: "Il workflow, pronto da importare. I controlli non richiedono credenziali.",
+    fl2: "Ogni regola in parole semplici: cosa significa e come si corregge",
+    fl3: "Gli esiti completi dei miei domini e della trappola",
+    fl4: "I nodi del workflow testati su risposte DNS preparate",
+    fl5: "Da dove nasce: una configurazione reale di Klaviyo e Shopify",
+    fl6: "Un'esecuzione fallita scrive su #martech-alerts",
+    honest: "Il mio dominio è tra gli esempi e non passa pulito: il DMARC è ancora in sola osservazione, senza indirizzo per i report. Sistemarlo è la prossima voce di questo repo.",
     close: "Chiudi",
-    by_rule: "regola",
-    lbl_from: "Da",
-    lbl_subject: "Oggetto",
-    lbl_preview: "Anteprima",
-    lbl_chars: "caratteri",
-    lbl_phone_cut: ", su telefono se ne vedono circa 50",
-    lbl_empty: "(vuota)",
-    lbl_sent_to: "Inviata a",
-    lbl_excluded: "Esclusi",
-    lbl_missing: ": mancante",
-    verdict_pass: "OK",
-    verdict_fail: "BLOCCATA",
-    tag_blocker: "bloccante",
-    tag_warning: "avviso",
-    lbl_fix: "Soluzione:",
-    clean_msg: "Nessun errore bloccante e nessun avviso. Lo sconto raggiunge solo i clienti A rischio, con le esclusioni per margine e blocco assistenza attive.",
-    note_pass: "Anche con esito OK si fa sempre un invio di prova su caselle reali prima di programmare.",
-    note_fail: "Gli errori bloccanti fermano l'invio: la bozza torna indietro con la lista delle correzioni.",
-    edge_pass: "ok",
-    edge_fail: "blocco",
-    kind_ai: "chiamata AI",
-    kind_err: "su errore",
-    kind_code: "regole",
   },
+};
+
+// Italian wording for each finding the rules node can return (the node itself writes English).
+const num = (f) => (f.issue.match(/\d+/) || [""])[0];
+const quoted = (f) => (f.issue.match(/"([^"]*)"/) || ["", ""])[1];
+const FIND_IT = {
+  spf_multiple: (f) => ({ issue: `Ci sono ${num(f)} record SPF.`, plain: "Due record SPF si annullano a vicenda: i provider considerano l'SPF non valido.", fix: "Uniscili in un solo record che inizia con v=spf1." }),
+  spf_missing: () => ({ issue: "Nessun record SPF.", plain: "Su questo dominio ci sono caselle di posta, ma i provider non possono sapere quali server sono autorizzati a inviare.", fix: "Pubblica sul dominio un record TXT che inizi con v=spf1 ed elenchi i servizi con cui invii." }),
+  spf_not_at_this_name: () => ({ issue: "Nessun record SPF a questo nome.", plain: "È normale per un sottodominio gestito da uno strumento di invio: l'SPF si controlla sull'indirizzo di ritorno nascosto, non sul mittente visibile.", fix: "Apri un'email vera inviata da questo dominio e verifica che nelle intestazioni ci sia spf=pass." }),
+  spf_allows_everyone: () => ({ issue: "L'SPF finisce con +all.", plain: "Autorizza qualunque server su internet a inviare email a tuo nome.", fix: "Chiudi il record con ~all oppure -all." }),
+  spf_neutral: () => ({ issue: "L'SPF non dà indicazioni sui server non elencati (?all, o all assente).", plain: "I provider non sanno come trattare i server che non sono nella tua lista.", fix: "Chiudi il record con ~all, poi con -all quando tutti i mittenti legittimi sono elencati." }),
+  spf_too_many_lookups: (f) => ({ issue: `L'SPF richiede ${num(f)} ricerche DNS; il limite è 10.`, plain: "Oltre le 10 ricerche l'SPF smette di funzionare e i provider trattano le tue email come non autenticate.", fix: "Togli dal record SPF i servizi che non usi più." }),
+  spf_near_lookup_limit: (f) => ({ issue: `L'SPF usa ${num(f)} delle 10 ricerche DNS consentite.`, plain: "Basta aggiungere un altro strumento al record per rompere l'SPF su tutte le email.", fix: "Togli i servizi inutilizzati prima di aggiungerne uno nuovo." }),
+  spf_count_is_minimum: () => ({ issue: "Una parte del record SPF non si può seguire dall'esterno.", plain: "Il numero di ricerche mostrato è un minimo, non il valore esatto.", fix: "Niente da correggere; se sei vicino a 10, fai verificare il conteggio dal tuo fornitore DNS o di posta." }),
+  dmarc_multiple: (f) => ({ issue: `Ci sono ${num(f)} record DMARC.`, plain: "Con più di un record i provider ignorano del tutto il DMARC.", fix: "Lascia un solo record su _dmarc." }),
+  dmarc_not_a_policy: (f, v) => ({ issue: `A ${v.dmarc_name} risponde un record TXT che non è una regola DMARC ("${quoted(f)}").`, plain: "Un pannello può mostrarlo come verificato, ma i provider non trovano nessuna regola. Di solito è un record jolly su un dominio parcheggiato o configurato male.", fix: "Controlla di lavorare sul dominio giusto, poi pubblica su _dmarc un record che inizi con v=DMARC1." }),
+  dmarc_missing: () => ({ issue: "Nessun record DMARC.", plain: "Nessuno dice ai provider cosa fare delle email che falsificano il tuo dominio. Gmail, Yahoo e Outlook.com chiedono inoltre il DMARC a chi invia grandi volumi.", fix: "Parti da: v=DMARC1; p=none; rua=mailto:<un indirizzo che leggi>" }),
+  dmarc_bad_policy: (f) => ({ issue: `Il DMARC non ha una regola valida (${(f.issue.match(/p=[^)]*/) || ["p="])[0]}).`, plain: "I provider ignorano un record DMARC senza un valore p= valido.", fix: "Imposta p=none, p=quarantine oppure p=reject." }),
+  dmarc_monitoring_only: () => ({ issue: "Il DMARC è in sola osservazione (p=none).", plain: "Le email che falsificano il tuo dominio vengono comunque consegnate: p=none chiede soltanto i report.", fix: "Leggi i report per qualche settimana, correggi ciò che fallisce, poi passa a p=quarantine e infine a p=reject." }),
+  dmarc_no_reports: (f) => ({ issue: "Il DMARC non ha un indirizzo per i report (rua).", plain: f.level === "warning" ? "Osservare senza un indirizzo per i report non serve: i report non li riceve nessuno." : "Non vedi chi invia a nome del tuo dominio né che cosa viene bloccato.", fix: "Aggiungi al record rua=mailto:<un indirizzo che leggi>." }),
+  dmarc_subdomains_open: () => ({ issue: "I sottodomini sono esclusi dalla regola (sp=none).", plain: "Le email false inviate da un tuo sottodominio vengono comunque consegnate.", fix: "Togli sp=none, oppure imposta sp su quarantine o reject." }),
+  dmarc_partial: (f) => ({ issue: `La regola si applica al ${num(f)}% delle email che falliscono i controlli.`, plain: "Il resto viene consegnato come se la regola non ci fosse.", fix: "Porta pct a 100 quando i report sono puliti." }),
+  dmarc_inherited: (f, v) => ({ issue: `Questo sottodominio non ha un suo record DMARC: la regola arriva da ${v.dmarc_name}.`, plain: "Per i sottodomini il DMARC funziona così.", fix: "Niente da fare, a meno che questo sottodominio non richieda una regola propria." }),
+  mx_missing: () => ({ issue: "Questo dominio non può ricevere email (nessun record MX).", plain: "Le risposte e gli avvisi di mancata consegna diretti a un indirizzo di questo dominio vanno persi.", fix: "Usa un mittente e un indirizzo di risposta su un dominio che riceve posta, oppure aggiungi i record MX." }),
+  dkim_not_checked: () => ({ issue: "DKIM non controllato: per questo dominio non è indicato nessun selettore.", plain: "Una chiave DKIM non si trova dall'esterno senza conoscere il nome del suo selettore.", fix: "Apri un'email vera inviata da questo dominio, cerca s= nell'intestazione DKIM-Signature e aggiungilo ai selettori da controllare." }),
+  dkim_selector_missing: (f) => ({ issue: `Nessuna chiave DKIM al selettore "${quoted(f)}".`, plain: "I messaggi firmati con questo selettore falliscono il DKIM, e quindi può fallire anche il DMARC.", fix: "Pubblica il record DKIM fornito dal tuo strumento di invio, oppure correggi il nome del selettore." }),
+  dkim_key_revoked: (f) => ({ issue: `La chiave DKIM al selettore "${quoted(f)}" è vuota (revocata).`, plain: "I messaggi firmati con questo selettore falliscono il DKIM.", fix: "Pubblica la chiave aggiornata del tuo strumento di invio." }),
+  lookup_failed: () => ({ issue: "La ricerca DNS non è riuscita.", plain: "Nessun esito per questa esecuzione: non è stato possibile leggere i record.", fix: "Niente da fare; riprova tra poco." }),
 };
 
 function detectLang() {
@@ -641,225 +591,207 @@ function detectLang() {
 }
 let LANG = detectLang();
 const tr = (k) => (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k;
-const pick = (v) => (v && typeof v === "object" && !Array.isArray(v) && ("en" in v || "it" in v)) ? (v[LANG] || v.en) : v;
-function countSummary(bCount, wCount) {
-  if (LANG === "it") {
-    const bTxt = `${bCount} ${bCount === 1 ? "errore bloccante" : "errori bloccanti"}`;
-    const wTxt = `${wCount} ${wCount === 1 ? "avviso" : "avvisi"}`;
-    return `${bTxt}, ${wTxt}`;
-  }
-  return `${bCount} blocker${bCount === 1 ? "" : "s"}, ${wCount} warning${wCount === 1 ? "" : "s"}`;
-}
-
-// Three example drafts. Issues follow the fixed rules (Code node) and the AI checks (prompt).
-const RULE_CATS = new Set(["personalization", "links", "utm", "unsubscribe", "mobile_ux", "preview_text", "accessibility"]);
-const by = (cat) => RULE_CATS.has(cat) ? `<span class="by">${esc(tr("by_rule"))}</span>` : '<span class="by ai">AI</span>';
-const DRAFTS = [
-  {
-    tab: { en: "Win-back, first draft", it: "Win-back, prima bozza" },
-    note: { en: "the real field-notes bug", it: "l'errore reale dai test" },
-    esp: "klaviyo",
-    segment: { en: "All Subscribers", it: "Tutti gli iscritti" },
-    from: "Negozio Online <news@send.negozio-online.org>",
-    subject: "Torna a trovarci oggi: un regalo speciale per te con spedizione 48h!",
-    preview: "",
-    body: [
-      ["mark", "Ciao ,", 1], ["text", " È passato un po' dal tuo ultimo ordine. Torna oggi e approfitta della "], ["mark", "spedizione garantita in 48 ore", 3], ["text", "."],
-      ["br"],
-      ["text", "Usa il codice TORNA15 ("], ["mark", "valido solo 14 giorni", 4], ["text", ") per il 15% di sconto."],
-    ],
-    cta: "Scopri la collezione", url: ["https://negozio-online.org/collezione", 2],
-    excluded: [
-      [{ en: "VIP / Champions", it: "VIP / Migliori clienti" }, false],
-      [{ en: "Purchased last 14 days", it: "Acquisto ultimi 14 giorni" }, false],
-      [{ en: "Active CX hold", it: "Blocco assistenza attivo" }, false],
-    ],
-    blockers: [
-      [
-        "personalization",
-        { en: '{{ first_name|default:\'\' }} renders "Ciao ," for profiles without a first name.', it: '{{ first_name|default:\'\' }} stampa "Ciao ," per chi non ha il nome salvato.' },
-        "Ciao{% if first_name %} {{ first_name }}{% endif %},",
-      ],
-      [
-        "utm",
-        { en: "The CTA link has no UTM parameters.", it: "Il link del bottone non ha parametri UTM di tracciamento." },
-        "?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback",
-      ],
-      [
-        "policy_mismatch",
-        { en: "Promises 48-hour shipping, but published_shipping_sla is null.", it: "Promette spedizione in 48 ore, ma il negozio non pubblica tempi garantiti (published_shipping_sla: null)." },
-        { en: "Remove the delivery-time claim.", it: "Rimuovi la promessa sui tempi di consegna." },
-      ],
-      [
-        "policy_mismatch",
-        { en: "Promises a 14-day expiry on the static code TORNA15.", it: "Promette una scadenza di 14 giorni sul codice fisso TORNA15." },
-        { en: "Use dynamic per-recipient coupons or drop the expiry.", it: "Usa coupon dinamici personali oppure togli la scadenza." },
-      ],
-      [
-        "vip_margin_guard",
-        { en: "A 15% discount goes to All Subscribers with no VIP, recent-buyer or CX-hold exclusion.", it: "Sconto del 15% inviato a tutti gli iscritti senza escludere VIP, acquirenti recenti o clienti con blocco assistenza." },
-        { en: "Exclude the segment Protect Full-Price Margin.", it: "Escludi il segmento Protect Full-Price Margin e Active CX Hold." },
-      ],
-    ],
-    warnings: [
-      [
-        "mobile_ux",
-        { en: "The subject is 68 characters; phones cut it near 50.", it: "L'oggetto ha 68 caratteri; sugli smartphone viene tagliato intorno a 50." },
-        { en: "Trim it to 50 characters or fewer.", it: "Accorcialo entro 50 caratteri." },
-        0,
-      ],
-      [
-        "preview_text",
-        { en: "The preview text is empty.", it: "Il testo di anteprima è vuoto." },
-        { en: "Add one line that the subject does not already say.", it: "Aggiungi una riga utile che completi l'oggetto." },
-        0,
-      ],
-    ],
-  },
-  {
-    tab: { en: "Black Friday, 20% off", it: "Black Friday, -20%" },
-    note: { en: "clean copy, margin leak", it: "testo pulito, margine scoperto" },
-    esp: "klaviyo",
-    segment: { en: "Engaged 180d", it: "Attivi ultimi 180g" },
-    from: "Negozio Online <news@send.negozio-online.org>",
-    subject: "Black Friday: 20% sulla nuova collezione",
-    preview: "Solo fino a domenica sera, reso gratuito in 30 giorni.",
-    body: [
-      ["ok", "Ciao Giulia,"], ["text", " solo per questo weekend il 20% di sconto su tutta la selezione stagionale. Il reso resta gratuito entro 30 giorni."],
-      ["br"],
-      ["text", "Usa il codice BF20 al checkout entro domenica sera."],
-    ],
-    cta: "Vai alla selezione Black Friday", url: ["https://negozio-online.org/black-friday?utm_source=klaviyo&utm_medium=email&utm_campaign=promo_bf_2026", 0],
-    excluded: [
-      [{ en: "VIP / Champions", it: "VIP / Migliori clienti" }, false],
-      [{ en: "Purchased last 14 days", it: "Acquisto ultimi 14 giorni" }, false],
-      [{ en: "Active CX hold", it: "Blocco assistenza attivo" }, false],
-    ],
-    blockers: [
-      [
-        "vip_margin_guard",
-        { en: "A 20% discount without the exclusions for VIPs, full-price repeat buyers, recent buyers and active CX holds.", it: "Sconto del 20% senza escludere VIP, clienti abituali a prezzo pieno, acquirenti recenti e clienti con blocco assistenza." },
-        { en: "Add Protect Full-Price Margin and Active CX Hold to the excluded segments.", it: "Aggiungi Protect Full-Price Margin e Active CX Hold tra i segmenti esclusi." },
-      ],
-    ],
-    warnings: [],
-  },
-  {
-    tab: { en: "Win-back, fixed", it: "Win-back, corretta" },
-    note: { en: "ready to schedule", it: "pronta da programmare" },
-    esp: "klaviyo",
-    segment: { en: "At risk (91-180d)", it: "A rischio (91-180g)" },
-    from: "Negozio Online <news@send.negozio-online.org>",
-    subject: "Un piccolo pensiero per il tuo ritorno",
-    preview: "Un codice per il tuo prossimo ordine, una volta sola.",
-    body: [
-      ["ok", "Ciao,"], ["text", " ci farebbe piacere rivederti. Come bentornato puoi usare il codice TORNA15 (una volta per cliente) per il 15% sul prossimo ordine."],
-      ["br"],
-      ["text", "Come sempre hai "], ["ok", "30 giorni di reso gratuito"], ["text", "."],
-    ],
-    cta: "Esplora i nuovi arrivi", url: ["https://negozio-online.org/collezione?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback", 0],
-    excluded: [
-      [{ en: "Protect Full-Price Margin", it: "Protect Full-Price Margin" }, true],
-      [{ en: "Active CX hold", it: "Blocco assistenza attivo" }, true],
-    ],
-    blockers: [],
-    warnings: [],
-  },
-];
-
+const plural = (k, n) => `${n} ${tr(k)[n === 1 ? 0 : 1]}`;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clean = (s) => String(s).replace(/\s*[\u2013\u2014]\s*/g, ": ");
-let WF = null, WF_TEXT = null, WF_FAILED = false, current = 0;
 
-const tabsEl = $("#tabs");
-function renderTabs() {
-  tabsEl.innerHTML = "";
-  DRAFTS.forEach((d, i) => {
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "tab"; b.setAttribute("role", "tab"); b.id = "tab-" + i;
-    b.setAttribute("aria-controls", "qa-panel");
-    b.innerHTML = `${esc(pick(d.tab))}<small>${esc(pick(d.note))}</small>`;
-    b.addEventListener("click", () => select(i));
-    b.addEventListener("keydown", (e) => {
-      const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
-      if (!k) return;
-      e.preventDefault();
-      const n = (i + k + DRAFTS.length) % DRAFTS.length;
-      select(n); tabsEl.children[n].focus();
-    });
-    tabsEl.append(b);
-  });
+let WF = null, WF_TEXT = null, WF_FAILED = false, SAMPLE = null, SAMPLE_FAILED = false;
+let lookupsFn = null, rulesFn = null;
+const STORED = new Map(); // domain -> verdict from the real n8n run
+let current = null;       // { verdict, meta: "live" | "stored", time }
+let runId = 0;
+
+// ---- the checker: runs the workflow's own two code nodes in the browser ----
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+const dnsHelpers = { httpRequest: ({ url }) => fetch(url, { signal: AbortSignal.timeout(9000) }).then((r) => (r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))) };
+
+function cleanDomain(value) {
+  let s = String(value).trim().toLowerCase();
+  if (s.includes("@")) s = s.split("@").pop();
+  s = s.replace(/^[a-z]+:\/\//, "").split(/[\/?#:\s]/)[0].replace(/^www\./, "").replace(/\.$/, "");
+  return /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/.test(s) ? s : null;
+}
+const cleanSelectors = (value) => String(value).toLowerCase().split(/[\s,;]+/).filter((s) => /^[a-z0-9._-]{1,63}$/.test(s)).slice(0, 4);
+
+async function runCheck(domain, selectors) {
+  const id = ++runId;
+  const stored = STORED.get(domain);
+  if (!lookupsFn) { // engine not loaded (yet): fall back to the stored real result, if there is one
+    if (stored) show(stored, "stored");
+    else if (WF_FAILED) busy(domain, tr("engine_err"), false);
+    else busy(domain, tr("sum_busy"), true);
+    return;
+  }
+  busy(domain, tr("sum_busy"), true);
+  $("#go").disabled = true;
+  try {
+    const raw = (await lookupsFn.call({ helpers: dnsHelpers }, { domain, dkim_selectors: selectors })).json;
+    const verdict = (await rulesFn.call({}, raw)).json;
+    if (id !== runId) return;
+    if (verdict.status === "ERROR" && stored) show(stored, "stored");
+    else show(verdict, "live");
+  } catch (err) {
+    if (id !== runId) return;
+    if (stored) show(stored, "stored");
+    else busy(domain, tr("sum_fail"), false);
+  } finally {
+    if (id === runId) $("#go").disabled = false;
+  }
 }
 
-function subjectHTML(s) {
-  const chars = [...s];
-  if (chars.length <= 50) return esc(s);
-  return esc(chars.slice(0, 50).join("")) + '<span class="cut" aria-hidden="true"></span><span class="over">' + esc(chars.slice(50).join("")) + "</span>";
+function busy(domain, message, pulsing) {
+  const el = $("#stamp");
+  el.className = "stamp" + (pulsing ? " busy" : " error");
+  el.innerHTML = `<b>${esc(tr(pulsing ? "st_BUSY" : "st_ERROR"))}</b><span class="dom">${esc(domain)}</span><span class="meta">${esc(message)}</span>`;
 }
 
-function mailHTML(d) {
-  const len = [...d.subject].length;
-  const body = d.body.map(([t, text, n]) =>
-    t === "br" ? "</p><p>" : t === "mark" ? `<span class="mark">${esc(text)}<sup>${n}</sup></span>` : t === "ok" ? `<span class="ok">${esc(text)}</span>` : esc(text)).join("");
-  const [url, urlIssue] = d.url;
-  return `
-    <div class="mail-head">
-      <div class="row"><span class="k">${esc(tr("lbl_from"))}</span><span>${esc(d.from)}</span></div>
-      <div class="row"><span class="k">${esc(tr("lbl_subject"))}</span><span class="subj">${subjectHTML(d.subject)}</span></div>
-      <div class="row"><span class="k"></span><span class="count ${len > 50 ? "bad" : ""}">${len} ${esc(tr("lbl_chars"))}${len > 50 ? esc(tr("lbl_phone_cut")) : ""}</span></div>
-      <div class="row"><span class="k">${esc(tr("lbl_preview"))}</span><span>${d.preview ? esc(d.preview) : `<span class="count bad">${esc(tr("lbl_empty"))}</span>`}</span></div>
-    </div>
-    <div class="mail-body"><p>${body}</p><span class="cta">${esc(d.cta)}</span><div class="url">${urlIssue ? `<span class="mark">${esc(url)}<sup>${urlIssue}</sup></span>` : esc(url)}</div></div>
-    <div class="aud"><b>${esc(tr("lbl_sent_to"))}</b><span class="pill">${esc(pick(d.segment))}</span><b style="margin-left:8px">${esc(tr("lbl_excluded"))}</b>${d.excluded.map(([n, on]) => `<span class="pill ${on ? "on" : "missing"}">${esc(pick(n))}${on ? "" : esc(tr("lbl_missing"))}</span>`).join("")}</div>`;
+function show(verdict, meta) {
+  current = { verdict, meta, time: new Date() };
+  renderStamp();
+  renderVerdict();
+  const url = new URL(location.href);
+  if (verdict.domain === DEFAULT_DOMAIN) url.searchParams.delete("d"); else url.searchParams.set("d", verdict.domain);
+  history.replaceState(null, "", url);
 }
 
-function select(i) {
-  current = i;
-  [...tabsEl.children].forEach((b, j) => { b.setAttribute("aria-selected", String(j === i)); b.tabIndex = j === i ? 0 : -1; });
-  $("#qa-panel").setAttribute("aria-labelledby", "tab-" + i);
-  const d = DRAFTS[i];
-  $("#mail").innerHTML = mailHTML(d);
+const localize = (f, v) => (LANG === "it" && FIND_IT[f.code] ? { ...f, ...FIND_IT[f.code](f, v) } : f);
+const level = (v, l) => v.findings.filter((f) => f.level === l);
 
-  const pass = d.blockers.length === 0;
-  const items = d.blockers.map(([cat, issue, fix], j) => `<li><span class="n">${j + 1}</span><span class="cat"><b>${esc(tr("tag_blocker"))}</b> ${esc(cat)}${by(cat)}</span><p>${esc(pick(issue))}</p><p class="fix">${esc(tr("lbl_fix"))} ${esc(pick(fix))}</p></li>`)
-    .concat(d.warnings.map(([cat, issue, fix]) => `<li class="w"><span class="n">!</span><span class="cat"><b>${esc(tr("tag_warning"))}</b> ${esc(cat)}${by(cat)}</span><p>${esc(pick(issue))}</p><p class="fix">${esc(tr("lbl_fix"))} ${esc(pick(fix))}</p></li>`));
-  const slackNode = WF && WF.nodes.find((n) => n.type.endsWith("slack") && n.name.includes(pass ? "PASS" : "BLOCKED"));
-  $("#result").innerHTML = `
-    <div class="verdict ${pass ? "pass" : "fail"}"><b>${esc(pass ? tr("verdict_pass") : tr("verdict_fail"))}</b><span>${esc(countSummary(d.blockers.length, d.warnings.length))}</span></div>
-    ${items.length ? `<ol class="issues">${items.join("")}</ol>` : `<p class="clean">${esc(tr("clean_msg"))}</p>`}
-    ${slackNode ? `<div class="slack"><div class="ch">${esc(slackNode.parameters.channelId?.value || slackNode.parameters.channel || "#crm-qa")}</div>${slackText(slackNode.parameters.text, d)}</div>` : ""}
-    <p class="small">${esc(pass ? tr("note_pass") : tr("note_fail"))}</p>`;
-  $("#result").querySelectorAll(".issues li").forEach((li, j) => (li.style.animationDelay = j * 50 + "ms"));
+function renderStamp() {
+  if (!current) return;
+  const { verdict: v, meta, time } = current;
+  const hhmm = time.toLocaleTimeString(LANG === "it" ? "it-IT" : "en-GB", { hour: "2-digit", minute: "2-digit" });
+  const counts = v.status === "ERROR" ? "" : `${plural("blockers", level(v, "blocker").length)}, ${plural("warnings", level(v, "warning").length)}. `;
+  const el = $("#stamp");
+  el.className = "stamp " + v.status.toLowerCase();
+  el.innerHTML = `<b>${esc(tr("st_" + v.status))}</b><span class="dom">${esc(v.domain)}</span>
+    <span class="meta">${esc(counts)}${esc(meta === "live" ? tr("sum_live") + " " + hhmm : tr("sum_stored"))}</span>
+    <a href="#verdict">${esc(tr("sum_link"))}</a>`;
 }
 
-function slackText(template, d) {
-  const text = template.replace(/^=/, "").replace(/\{\{([\s\S]*?)\}\}/g, (_, x) =>
-    /\.esp\b/.test(x) ? d.esp
-    : /\.subject\b/.test(x) ? d.subject
-    : /target_segment_name/.test(x) ? pick(d.segment)
-    : /excluded_segments/.test(x) ? (d.excluded.filter(([, on]) => on).map(([n]) => pick(n)).join(", ") || (LANG === "it" ? "Nessuno" : "None"))
-    : /blockers[\s\S]*\.map/.test(x) ? d.blockers.map(([cat, issue, fix]) => `• *${cat}*: ${pick(issue)} -> _${tr("lbl_fix")}_ ${pick(fix)}`).join("\n")
-    : /blockers/.test(x) ? String(d.blockers.length)
-    : "...");
-  return esc(clean(text.replace(/:[a-z_]+:\s*/g, "")))
-    .replace(/\*([^*]+)\*/g, "<strong>$1</strong>")
-    .replace(/(^|\s)_([^_]+)_(?=\s|$)/g, "$1<em>$2</em>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .split("\n").map((l) => `<p>${l}</p>`).join("");
+function findingHTML(f, v, i) {
+  const t = localize(f, v);
+  const cls = f.level === "blocker" ? "" : f.level === "warning" ? "w" : "o";
+  const label = tr(f.level === "blocker" ? "blockers" : f.level === "warning" ? "warnings" : "notes")[0];
+  return `<li class="${cls}" style="animation-delay:${i * 50}ms"><span class="cat">${esc(label)}</span>
+    <h3>${esc(t.issue)}</h3><p><b>${esc(tr("means"))}</b> ${esc(t.plain)}</p><p><b>${esc(tr("fix"))}</b> ${esc(t.fix)}</p></li>`;
 }
 
-// ---- the gate, drawn from the workflow file ----
-const NODE_W = 104;
-function draw() {
+function renderVerdict() {
+  if (!current) return;
+  const v = current.verdict;
+  $("#v-dom").textContent = v.domain;
+  const main = [...level(v, "blocker"), ...level(v, "warning")];
+  const notes = level(v, "note");
+  $("#findings").innerHTML =
+    (main.length ? `<ol class="issues">${main.map((f, i) => findingHTML(f, v, i)).join("")}</ol>` : `<p class="clean">${esc(tr("v_clean"))}</p>`) +
+    (notes.length ? `<details class="notes"><summary>${esc(plural("notes", notes.length))}</summary><ul class="issues">${notes.map((f, i) => findingHTML(f, v, i)).join("")}</ul></details>` : "");
+
+  const tools = v.senders.length ? v.senders.map((s) => `<span class="pill">${esc(s)}</span>`).join("") : esc(tr(v.spf ? "fa_tools_none" : "fa_none"));
+  const other = v.other_includes.length ? `<small>+ ${v.other_includes.length} ${esc(tr("fa_other"))}: ${esc(v.other_includes.join(", "))}</small>` : "";
+  const dkim = (v.dkim_checked || []).length ? v.dkim_checked.map((s) => `<span class="pill">${esc(s)}</span>`).join("") : esc(tr("fa_dkim_none"));
+  const row = (k, html) => `<div><dt>${esc(tr(k))}</dt><dd>${html}</dd></div>`;
+  $("#facts").innerHTML = `<dl class="facts">
+      ${row("fa_dmarc", esc(tr("stage_" + v.dmarc_stage)))}
+      ${row("fa_spf", `${esc(v.spf_lookups)} ${esc(tr("fa_spf_val"))}`)}
+      ${row("fa_mail", esc(v.mailbox_provider === "none" ? tr("fa_none") : v.mailbox_provider))}
+      ${row("fa_tools", tools + other)}
+      ${row("fa_dkim", dkim)}
+    </dl>
+    <pre class="term" aria-label="${esc(tr("fa_records"))}"><span class="d"># ${esc(tr("fa_records"))}</span>
+<span class="d">TXT ${esc(v.domain)}</span>
+${esc(v.spf || tr("rec_none"))}
+<span class="d">TXT ${esc(v.dmarc_name)}</span>
+${esc(v.dmarc || tr("rec_none"))}</pre>`;
+}
+
+$("#checker").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const domain = cleanDomain($("#dom").value);
+  const errEl = $("#dom-err");
+  if (!domain) { errEl.textContent = tr("f_err"); errEl.hidden = false; $("#dom").setAttribute("aria-invalid", "true"); return; }
+  errEl.hidden = true; $("#dom").removeAttribute("aria-invalid");
+  $("#dom").value = domain;
+  runCheck(domain, cleanSelectors($("#sel").value));
+});
+function tryExample(domain, selectors) {
+  $("#dom").value = domain; $("#sel").value = selectors || "";
+  $("#dom-err").hidden = true;
+  runCheck(domain, cleanSelectors(selectors || ""));
+}
+document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => tryExample(c.dataset.d, c.dataset.s)));
+$("#trap").addEventListener("click", () => { tryExample("mionegozio.com"); $("#check").scrollIntoView({ block: "center" }); });
+
+// ---- the 20-company sample, read from the CSV ----
+function parseCSV(text) {
+  const rows = [];
+  for (const line of text.trim().split(/\r?\n/)) {
+    const cells = []; let cur = "", q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) { if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+      else if (ch === '"') q = true; else if (ch === ",") { cells.push(cur); cur = ""; } else cur += ch;
+    }
+    cells.push(cur); rows.push(cells);
+  }
+  const [head, ...body] = rows;
+  return body.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] || ""])));
+}
+const tally = (list) => { const m = new Map(); for (const x of list) m.set(x, (m.get(x) || 0) + 1); return m; };
+
+function barsHTML(pairs, labelWidth) {
+  const max = Math.max(...pairs.map(([, n]) => n), 1);
+  return `<ul class="bars" style="--lw:${labelWidth}px">${pairs.map(([label, n], i) =>
+    `<li class="${n ? "" : "zero"}" title="${esc(label)}: ${n}"><span class="lb">${esc(label)}</span><span class="bw"><span class="bar" style="--v:${n / max};animation-delay:${i * 60}ms"></span><span class="val">${n}</span></span></li>`).join("")}</ul>`;
+}
+
+function drawSample() {
+  const box = $("#bento");
+  if (SAMPLE_FAILED) { box.innerHTML = `<p class="graph-msg" style="grid-column:1/-1">${esc(tr("data_err"))}</p>`; $("#figures-band").hidden = true; return; }
+  if (!SAMPLE) return;
+  const n = SAMPLE.length;
+  const stage = tally(SAMPLE.map((r) => r.dmarc_stage));
+  const stageRows = [["row_reject", "reject"], ["row_quarantine", "quarantine"], ["row_monitoring", "monitoring"], ["row_missing", "missing"]].map(([k, s]) => [tr(k), stage.get(s) || 0]);
+
+  const lookups = SAMPLE.map((r) => Number(r.spf_lookups));
+  const cols = Math.max(12, ...lookups);
+  const strip = Array.from({ length: cols }, (_, i) => i + 1).map((x) => {
+    const here = lookups.filter((v) => v === x).length;
+    const cls = x > 10 ? "over" : x >= 9 ? "near" : "";
+    return `<div class="col${x === 10 ? " limit" : ""}" title="${x}: ${plural("companies", here)}"><div class="sq-stack">${`<span class="sq ${cls}"></span>`.repeat(here)}</div><span class="x">${x}</span></div>`;
+  }).join("");
+  const over = lookups.filter((v) => v > 10).length, near = lookups.filter((v) => v === 9 || v === 10).length;
+
+  const tools = [...tally(SAMPLE.flatMap((r) => r.email_tools_in_spf.split("; ").filter(Boolean)))].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const mail = tally(SAMPLE.map((r) => r.mailbox_provider));
+  const mailRows = [...mail].filter(([k]) => k !== "other").sort((a, b) => b[1] - a[1]);
+  if (mail.get("other")) mailRows.push([tr("other"), mail.get("other")]);
+
+  const fig = (value, key) => `<div><b>${value}</b><span>${esc(tr(key))}</span></div>`;
+  $("#figures").innerHTML = fig(n, "fig_n") + fig(stage.get("monitoring") || 0, "fig_mon") + fig(over + near, "fig_spf") + fig(RUN_DOMAINS, "fig_run");
+  box.innerHTML = `
+    <div class="cell c-dmarc"><h3>${esc(tr("ch_dmarc_h"))}</h3>${barsHTML(stageRows, 210)}<p class="take"><b>${stage.get("monitoring") || 0} ${esc(tr("of"))} ${n}</b> ${esc(tr("take_dmarc"))}</p></div>
+    <div class="cell c-spf"><h3>${esc(tr("ch_spf_h"))}</h3><p>${esc(tr("ch_spf_p"))}</p>
+      <div class="strip" style="--cols:${cols}" role="img" aria-label="${esc(tr("ch_spf_h"))}: ${over} ${esc(tr("lg_over"))}, ${near} ${esc(tr("lg_near"))}">${strip}</div>
+      <div class="legend"><span><i class="over"></i>${esc(tr("lg_over"))}: ${over}</span><span><i class="near"></i>${esc(tr("lg_near"))}: ${near}</span><span><i></i>${esc(tr("lg_ok"))}: ${n - over - near}</span><span><i class="dash"></i>${esc(tr("lg_limit"))}</span></div></div>
+    <div class="cell c-tools"><h3>${esc(tr("ch_tools_h"))}</h3><p>${esc(tr("ch_tools_p"))}</p>${barsHTML(tools, 180)}</div>
+    <div class="cell c-mail"><h3>${esc(tr("ch_mail_h"))}</h3>${barsHTML(mailRows, 150)}</div>`;
+}
+
+// ---- the workflow graph, drawn from the n8n file ----
+const NODE_W = 108;
+function drawGraph() {
   const el = $("#canvas");
+  if (WF_FAILED) { el.innerHTML = `<p class="graph-msg">${esc(tr("graph_err"))}</p>`; return; }
+  if (!WF) return;
   const nodes = WF.nodes;
   const xs = nodes.map((n) => n.position[0]), ys = nodes.map((n) => n.position[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const pad = 20, width = Math.max(el.parentElement.clientWidth, 820);
+  const pad = 22, width = Math.max(el.parentElement.clientWidth, 860);
   const s = (width - 2 * pad - NODE_W) / (maxX - minX);
   el.style.width = width + "px";
-  el.style.height = Math.round((maxY - minY) * s + 2 * pad + 66) + "px";
+  el.style.height = Math.round((maxY - minY) * s + 2 * pad + 62) + "px";
   const pos = new Map(nodes.map((n) => [n.name, { x: pad + (n.position[0] - minX) * s, y: pad + (n.position[1] - minY) * s }]));
   el.innerHTML = "";
   const NS = "http://www.w3.org/2000/svg";
@@ -873,67 +805,86 @@ function draw() {
       p.setAttribute("class", "edge"); svg.append(p);
       if (nodes.find((n) => n.name === src).type.endsWith(".if")) {
         const tx = document.createElementNS(NS, "text");
-        tx.setAttribute("x", x1 + 6); tx.setAttribute("y", y1 + (y2 > y1 ? 16 : -8));
-        tx.setAttribute("class", "elabel"); tx.textContent = oi === 0 ? tr("edge_pass") : tr("edge_fail"); svg.append(tx);
+        tx.setAttribute("x", x1 + 6); tx.setAttribute("y", y1 - 8);
+        tx.setAttribute("class", "elabel"); tx.textContent = tr(oi === 0 ? "yes" : "no"); svg.append(tx);
       }
     }));
   }
   for (const n of nodes) {
     const p = pos.get(n.name), d = document.createElement("div");
     const t = n.type.split(".").pop();
-    d.className = "node" + (n.name.includes("PASS") ? " pass" : n.name.includes("BLOCKED") ? " fail" : t === "errorTrigger" || n.name.includes("martech") ? " err" : "");
+    const live = n.name.startsWith("DNS Lookups") || n.name.startsWith("Rules:");
+    d.className = "node" + (live ? " live" : "");
     d.style.left = p.x + "px"; d.style.top = p.y + "px"; d.title = clean(n.name);
     const i = n.name.indexOf(": ");
-    const short = clean((i > -1 ? n.name.slice(i + 2) : n.name).replace(/\s*\((JSON|#crm-qa|Safe Defaults)\)/g, ""));
-    const kind = { httpRequest: tr("kind_ai"), errorTrigger: tr("kind_err"), set: "set", code: tr("kind_code") }[t] || t;
-    d.innerHTML = `<span class="k">${esc(kind)}</span>${esc(short)}`;
+    const short = clean((["scheduleTrigger", "manualTrigger", "slack", "if"].includes(t) && i > -1 ? n.name.slice(i + 2) : n.name).replace(/\s*\((Public DNS, No Credentials|No AI|#[a-z-]+)\)/g, "").replace(/^Rules: /, ""));
+    d.innerHTML = `<span class="k">${esc(tr("k_" + t))}</span>${esc(short)}`;
     el.append(d);
   }
 }
 
-function renderHero() {
-  const first = DRAFTS[0];
-  $("#hero-card").setAttribute("aria-label", tr("hero_card_label"));
-  $("#hero-mail").innerHTML = mailHTML(first);
-  $("#hero-stamp").innerHTML = `<b>${esc(tr("verdict_fail"))}</b>${esc(countSummary(first.blockers.length, first.warnings.length))}`;
-}
-
+// ---- language ----
 function applyLang(lang) {
   LANG = lang === "it" ? "it" : "en";
   document.documentElement.lang = LANG;
   document.title = tr("page_title");
   try { localStorage.setItem("portfolio_lang", LANG); } catch {}
+  const here = new URL(location.href);
+  if (here.searchParams.has("lang")) { here.searchParams.set("lang", LANG); history.replaceState(null, "", here); }
   document.querySelectorAll(".lang-switch button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)));
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = tr(el.dataset.i18n); });
   document.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = tr(el.dataset.i18nHtml); });
-  renderHero();
-  renderTabs();
-  select(current);
-  if (WF) draw();
-  else if (WF_FAILED) $("#canvas").innerHTML = `<p class="graph-msg">${tr("graph_err")}</p>`;
+  $("#dom").placeholder = LANG === "it" ? "azienda.it" : "company.com";
+  renderStamp(); renderVerdict(); drawSample(); drawGraph();
 }
-
 document.querySelectorAll(".lang-switch button").forEach((b) => b.addEventListener("click", () => applyLang(b.dataset.lang)));
+document.querySelectorAll("[data-gh]").forEach((a) => { a.href = GH + (a.dataset.gh ? "/" + a.dataset.gh : ""); });
+$("#dl").href = BASE + WF_FILE;
 
-fetch(BASE + "workflows/ai-email-preflight-qa.n8n.json")
+// ---- load: stored real results first, then the engine, then a live check ----
+const startDomain = cleanDomain(new URLSearchParams(location.search).get("d") || "") || DEFAULT_DOMAIN;
+$("#dom").value = startDomain;
+busy(startDomain, tr("sum_busy"), true);
+$("#v-dom").textContent = startDomain;
+
+const storedReady = fetch(BASE + "data/own-domains-2026-11-21.json")
+  .then((r) => (r.ok ? r.json() : []))
+  .then((list) => { for (const v of list) STORED.set(v.domain, v); if (STORED.has(startDomain) && !current) show(STORED.get(startDomain), "stored"); })
+  .catch(() => {});
+
+fetch(BASE + WF_FILE)
   .then((r) => (r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status))))
-  .then((text) => { WF_TEXT = text; WF = JSON.parse(text); draw(); select(current); })
-  .catch(() => { WF_FAILED = true; $("#canvas").innerHTML = `<p class="graph-msg">${tr("graph_err")}</p>`; });
+  .then((text) => {
+    WF_TEXT = text; WF = JSON.parse(text);
+    const code = (prefix) => WF.nodes.find((n) => n.name.startsWith(prefix)).parameters.jsCode;
+    lookupsFn = new AsyncFunction("$json", code("DNS Lookups"));
+    rulesFn = new AsyncFunction("$json", code("Rules:"));
+    drawGraph();
+  })
+  .catch(() => { WF_FAILED = true; drawGraph(); })
+  .then(() => storedReady)
+  .then(() => runCheck(startDomain, startDomain === "send.negozio-online.org" ? ["s1", "s2"] : []));
+
+fetch(BASE + "data/italian-b2b-sample-2026-11-21.csv")
+  .then((r) => (r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status))))
+  .then((t) => { SAMPLE = parseCSV(t); drawSample(); })
+  .catch(() => { SAMPLE_FAILED = true; drawSample(); });
 
 let rt;
-window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => WF && draw(), 150); });
+window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawGraph, 150); });
 
+// A real download of the file already fetched for the graph.
 $("#dl").addEventListener("click", (e) => {
   if (!WF_TEXT) return;
   e.preventDefault();
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([WF_TEXT], { type: "application/json" }));
-  a.download = "ai-email-preflight-qa.n8n.json";
+  a.download = "sender-domain-health.n8n.json";
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 
-// ---- lightbox for the real screenshots ----
+// ---- lightbox for the real terminal capture ----
 const box = $("#lightbox"), boxImg = $("#lightbox-img");
 document.querySelectorAll("[data-full]").forEach((b) => b.addEventListener("click", () => {
   boxImg.src = b.dataset.full; boxImg.alt = b.querySelector("img").alt;

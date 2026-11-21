@@ -1,0 +1,294 @@
+{
+  "name": "Sender Domain Health: SPF, DKIM & DMARC Check and Monitor",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Schedule: Every Monday 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        140,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "notes": "Weekly check. DNS changes rarely, so weekly is enough to catch a record someone edited."
+    },
+    {
+      "id": "2",
+      "name": "Manual: Run Now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        140,
+        400
+      ],
+      "parameters": {},
+      "notes": "Run a check on demand, for example right after a DNS change."
+    },
+    {
+      "id": "3",
+      "name": "Domains to Watch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// One row per domain you send email from. Replace these with your own,\n// or swap this node for a Google Sheets \"Get rows\" node with the same columns.\n// dkim_selectors: the s= value in the DKIM-Signature header of a real email from that domain.\nreturn [\n  { json: { domain: 'negozio-online.org', label: 'root domain, mailboxes', dkim_selectors: [] } },\n  { json: { domain: 'send.negozio-online.org', label: 'marketing sending subdomain', dkim_selectors: ['s1', 's2'] } },\n];"
+      },
+      "notes": "The list of sending domains. Edit it here, or replace the node with a Google Sheets read."
+    },
+    {
+      "id": "4",
+      "name": "DNS Lookups (Public DNS, No Credentials)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Reads the public DNS records that authenticate email for one domain.\n// Uses a public DNS service over HTTPS: no credentials, same answers as nslookup.\nconst domain = String($json.domain || '').trim().toLowerCase().replace(/\\.$/, '');\nconst http = (url) => this.helpers.httpRequest({ method: 'GET', url, json: true });\nconst errors = [];\n\n// One DNS question. Returns the answer strings, [] when nothing is published, null when the lookup failed.\nasync function ask(name, type) {\n  try {\n    const res = await http('https://dns.google/resolve?name=' + encodeURIComponent(name) + '&type=' + type);\n    if (res.Status !== 0 && res.Status !== 3) throw new Error('DNS status ' + res.Status);\n    const wanted = type === 'MX' ? 15 : 16;\n    return (res.Answer || [])\n      .filter((a) => a.type === wanted)\n      .map((a) => String(a.data).replace(/\"\\s*\"/g, '').replace(/^\"|\"$/g, '').trim());\n  } catch (err) {\n    errors.push(type + ' ' + name + ': ' + (err.message || err));\n    return null;\n  }\n}\n\n// SPF: follow every include and redirect, counting DNS lookups (the standard allows 10).\nconst spfRecords = [];\nconst spfIncludes = []; // named in the domain's own record\nconst spfTree = []; // every include and redirect in the whole tree\nlet spfLookups = 0;\nlet spfExact = true;\nconst fetched = new Map();\n\nasync function walkSpf(name, path) {\n  if (path.includes(name) || spfLookups > 40) return; // a loop, or a record far past any limit\n  const top = path.length === 0;\n  if (!fetched.has(name)) {\n    const before = errors.length;\n    const answers = await ask(name, 'TXT');\n    if (answers === null && !top) errors.length = before; // a broken include is not a failure of the whole check\n    fetched.set(name, answers);\n  }\n  const answers = fetched.get(name);\n  if (answers === null) {\n    spfExact = false;\n    return;\n  }\n  const records = answers.filter((t) => /^v=spf1(\\s|$)/i.test(t));\n  if (top) spfRecords.push(...records);\n  if (records.length !== 1) return;\n  for (const raw of records[0].split(/\\s+/).slice(1)) {\n    const term = raw.replace(/^[+\\-~?]/, '').toLowerCase();\n    const target = (term.match(/^(?:include:|redirect=)(.+)$/) || [])[1];\n    if (target) {\n      spfLookups += 1;\n      if (top) spfIncludes.push(target);\n      spfTree.push(target);\n      if (target.includes('%{')) spfExact = false; // a macro cannot be followed from outside\n      else await walkSpf(target, [...path, name]);\n    } else if (/^(a|mx|ptr)([:\\/]|$)/.test(term) || term.startsWith('exists:')) {\n      spfLookups += 1;\n    }\n  }\n}\nawait walkSpf(domain, []);\n\n// DMARC lives at _dmarc.<domain>. A subdomain without its own record inherits from the closest parent that has one.\nconst isDmarc = (t) => /^v=dmarc1(\\s|;|$)/i.test(t);\nlet dmarcName = '_dmarc.' + domain;\nlet dmarcTxt = await ask(dmarcName, 'TXT');\nconst ownTxt = dmarcTxt || [];\nlet inherited = false;\nconst labels = domain.split('.');\nfor (let i = 1; dmarcTxt && !dmarcTxt.some(isDmarc) && labels.length - i >= 2; i++) {\n  const parent = labels.slice(i).join('.');\n  const parentTxt = await ask('_dmarc.' + parent, 'TXT');\n  if (parentTxt && parentTxt.some(isDmarc)) {\n    dmarcTxt = parentTxt;\n    dmarcName = '_dmarc.' + parent;\n    inherited = true;\n  }\n}\n\nconst mx = await ask(domain, 'MX');\n\n// DKIM keys can only be found by selector name (the s= value in a real email's DKIM-Signature header).\nconst dkim = [];\nfor (const selector of $json.dkim_selectors || []) {\n  const before = errors.length;\n  const answers = await ask(selector + '._domainkey.' + domain, 'TXT');\n  if (answers === null) {\n    errors.length = before;\n    continue;\n  }\n  const key = answers.find((t) => /(^|;)\\s*p=/i.test(t));\n  dkim.push({ selector, found: Boolean(key), revoked: Boolean(key) && /(^|;)\\s*p=\\s*(;|$)/i.test(key) });\n}\n\nreturn {\n  json: {\n    domain,\n    label: $json.label || '',\n    checked_at: new Date().toISOString(),\n    spf_records: spfRecords,\n    spf_lookups: spfLookups,\n    spf_lookups_exact: spfExact,\n    spf_includes: spfIncludes,\n    spf_tree: [...new Set(spfTree)],\n    dmarc_records: (dmarcTxt || []).filter(isDmarc),\n    dmarc_other_txt: inherited ? [] : ownTxt.filter((t) => !isDmarc(t)),\n    dmarc_name: dmarcName,\n    dmarc_inherited: inherited,\n    mx: mx || [],\n    dkim,\n    lookup_errors: errors,\n  },\n};"
+      },
+      "notes": "Asks public DNS for SPF (following every include), DMARC, MX and the listed DKIM selectors. No credentials: it reads what any mailbox provider reads."
+    },
+    {
+      "id": "5",
+      "name": "Rules: Grade the Domain (No AI)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Fixed rules, no AI: each finding says what is wrong, what it means in plain words, and how to fix it.\nconst d = $json;\nconst findings = [];\nconst add = (code, level, issue, plain, fix) => findings.push({ code, level, issue, plain, fix });\n\n// Which mailbox provider receives email for this domain (from the MX records).\nconst MAILBOXES = [\n  ['protection.outlook.com', 'Microsoft 365'], ['mx.microsoft', 'Microsoft 365'], ['google.com', 'Google Workspace'], ['googlemail.com', 'Google Workspace'],\n  ['pphosted.com', 'Proofpoint'], ['ppe-hosted.com', 'Proofpoint'], ['mimecast', 'Mimecast'], ['iphmx.com', 'Cisco Secure Email'],\n  ['messagelabs.com', 'Symantec Email Security'], ['barracudanetworks.com', 'Barracuda'], ['trendmicro', 'Trend Micro'],\n  ['hornetsecurity.com', 'Hornetsecurity'], ['esvacloud.com', 'Libraesva'], ['mx.cloudflare.net', 'Cloudflare Email Routing'],\n];\n// Which email tools the SPF record authorises to send as this domain.\nconst SENDERS = [\n  ['spf.protection.outlook.com', 'Microsoft 365'], ['_spf.google.com', 'Google Workspace'], ['hubspotemail.net', 'HubSpot'],\n  ['_spf.salesforce.com', 'Salesforce'], ['pardot.com', 'Salesforce Account Engagement'], ['mktomail.com', 'Marketo'],\n  ['servers.mcsv.net', 'Mailchimp'], ['mandrillapp.com', 'Mailchimp Transactional'], ['sendgrid.net', 'SendGrid'],\n  ['mailgun.org', 'Mailgun'], ['amazonses.com', 'Amazon SES'], ['sendinblue.com', 'Brevo'], ['brevo.com', 'Brevo'],\n  ['mailjet.com', 'Mailjet'], ['mtasv.net', 'Postmark'], ['zendesk.com', 'Zendesk'], ['freshdesk.com', 'Freshdesk'],\n  ['musvc.com', 'MailUp'], ['magnews.net', 'MagNews'], ['customerly.io', 'Customerly'], ['docebosaas.com', 'Docebo'],\n  ['successfactors.com', 'SAP SuccessFactors'], ['sapsf.eu', 'SAP SuccessFactors'], ['knowbe4.com', 'KnowBe4'],\n  ['pphosted.com', 'Proofpoint'], ['ppe-hosted.com', 'Proofpoint'], ['mimecast', 'Mimecast'], ['trendmicro', 'Trend Micro'],\n  ['mx.cloudflare.net', 'Cloudflare Email Routing'],\n];\nconst nameOf = (table, host) => (table.find(([needle]) => host.includes(needle)) || [])[1];\n\nconst realMx = d.mx.filter((m) => !/^0\\s+\\.?$/.test(m));\nconst mxHost = realMx.length ? realMx[0].split(/\\s+/).pop().replace(/\\.$/, '').toLowerCase() : '';\nconst mailbox = mxHost ? nameOf(MAILBOXES, mxHost) || mxHost.split('.').slice(-2).join('.') : 'none';\nconst senders = [...new Set(d.spf_tree.map((h) => nameOf(SENDERS, h)).filter(Boolean))]; // the whole include tree\nconst otherIncludes = d.spf_includes.filter((h) => !nameOf(SENDERS, h));\n\n// ---- SPF: which servers may send for this domain ----\nconst spf = d.spf_records[0] || '';\nif (d.spf_records.length > 1) {\n  add('spf_multiple', 'blocker', 'There are ' + d.spf_records.length + ' SPF records.',\n    'Two SPF records cancel each other out: providers treat SPF as broken.',\n    'Merge them into one record that starts with v=spf1.');\n} else if (!spf && realMx.length) {\n  add('spf_missing', 'blocker', 'No SPF record.',\n    'People have mailboxes on this domain, but providers cannot tell which servers may send for it.',\n    'Publish one TXT record on the domain that starts with v=spf1 and lists your sending services.');\n} else if (!spf) {\n  add('spf_not_at_this_name', 'note', 'No SPF record at this name.',\n    'Normal for a subdomain run by an email tool: SPF is checked on the hidden return-path address, not on the visible From address.',\n    'Open a real email from this domain and confirm the headers say spf=pass.');\n} else {\n  const all = spf.match(/(?:^|\\s)([+\\-~?]?)all(?:\\s|$)/i);\n  const redirects = /(?:^|\\s)redirect=/i.test(spf);\n  if (all && (all[1] === '+' || all[1] === '')) {\n    add('spf_allows_everyone', 'blocker', 'SPF ends with +all.',\n      'This authorises every server on the internet to send email as you.',\n      'End the record with ~all or -all.');\n  } else if ((all && all[1] === '?') || (!all && !redirects)) {\n    add('spf_neutral', 'warning', 'SPF gives no verdict on unlisted servers (?all or no all).',\n      'Providers get no guidance about servers that are not on your list.',\n      'End the record with ~all, then -all once everything legitimate is listed.');\n  }\n  if (d.spf_lookups > 10) {\n    add('spf_too_many_lookups', 'blocker', 'SPF needs ' + d.spf_lookups + ' DNS lookups; the limit is 10.',\n      'Past 10 lookups SPF stops working, so providers treat your email as unauthenticated.',\n      'Remove services you no longer use from the SPF record.');\n  } else if (d.spf_lookups >= 9) {\n    add('spf_near_lookup_limit', 'warning', 'SPF uses ' + d.spf_lookups + ' of the 10 DNS lookups allowed.',\n      'One more email tool added to the record can break SPF for every message.',\n      'Remove unused services before adding a new one.');\n  }\n  if (!d.spf_lookups_exact) {\n    add('spf_count_is_minimum', 'note', 'Part of the SPF record could not be followed from outside.',\n      'The lookup count shown is a minimum, not the exact figure.',\n      'Nothing to fix; check the count with your DNS or email provider if it is close to 10.');\n  }\n}\n\n// ---- DMARC: what providers should do with email that fails the checks ----\nconst dmarc = d.dmarc_records[0] || '';\nconst tag = (key) => ((dmarc.match(new RegExp('(?:^|;)\\\\s*' + key + '\\\\s*=\\\\s*([^;]+)', 'i')) || [])[1] || '').trim().toLowerCase();\nlet stage = 'missing';\nif (d.dmarc_records.length > 1) {\n  stage = 'invalid';\n  add('dmarc_multiple', 'blocker', 'There are ' + d.dmarc_records.length + ' DMARC records.',\n    'With more than one record providers ignore DMARC completely.',\n    'Keep a single record at _dmarc.');\n} else if (!dmarc && d.dmarc_other_txt.length) {\n  stage = 'invalid';\n  add('dmarc_not_a_policy', 'blocker',\n    'A TXT record answers at ' + d.dmarc_name + ' but it is not a DMARC policy (\"' + d.dmarc_other_txt[0].slice(0, 40) + '\").',\n    'A dashboard can show this as verified, yet providers find no policy. The usual cause is a wildcard record on a parked or misconfigured domain.',\n    'Check you are working on the right domain, then publish a record that starts with v=DMARC1 at _dmarc.');\n} else if (!dmarc) {\n  add('dmarc_missing', 'blocker', 'No DMARC record.',\n    'Nothing tells mailbox providers what to do with email that fakes your domain. Gmail, Yahoo and Outlook.com also require DMARC from bulk senders.',\n    'Start with: v=DMARC1; p=none; rua=mailto:<an address you read>');\n} else {\n  const p = tag('p');\n  const sp = tag('sp');\n  const policy = d.dmarc_inherited && sp ? sp : p; // subdomains follow sp= when the organisation sets it\n  stage = policy === 'reject' ? 'reject' : policy === 'quarantine' ? 'quarantine' : policy === 'none' ? 'monitoring' : 'invalid';\n  if (stage === 'invalid') {\n    add('dmarc_bad_policy', 'blocker', 'DMARC has no valid policy (p=' + (p || 'missing') + ').',\n      'Providers ignore a DMARC record without a valid p= value.',\n      'Set p=none, p=quarantine or p=reject.');\n  }\n  if (stage === 'monitoring') {\n    add('dmarc_monitoring_only', 'warning', 'DMARC is in monitoring mode (p=none).',\n      'Email that fakes your domain is still delivered: p=none only asks for reports.',\n      'Read the reports for a few weeks, fix what fails, then move to p=quarantine and later p=reject.');\n  }\n  if (!tag('rua')) {\n    if (stage === 'monitoring') {\n      add('dmarc_no_reports', 'warning', 'DMARC has no report address (rua).',\n        'Monitoring mode without a report address monitors nothing: nobody receives the reports.',\n        'Add rua=mailto:<an address you read> to the record.');\n    } else {\n      add('dmarc_no_reports', 'note', 'DMARC has no report address (rua).',\n        'You cannot see who sends as your domain or what gets blocked.',\n        'Add rua=mailto:<an address you read> to the record.');\n    }\n  }\n  if (!d.dmarc_inherited && sp === 'none' && (p === 'quarantine' || p === 'reject')) {\n    add('dmarc_subdomains_open', 'warning', 'Subdomains are left out of the policy (sp=none).',\n      'Fake email from any subdomain of yours is still delivered.',\n      'Remove sp=none, or set sp to quarantine or reject.');\n  }\n  const pct = tag('pct');\n  if (pct && Number(pct) < 100 && stage !== 'monitoring') {\n    add('dmarc_partial', 'note', 'The policy applies to ' + pct + '% of failing email.',\n      'The rest is delivered as if there were no policy.',\n      'Raise pct to 100 once the reports are clean.');\n  }\n  if (d.dmarc_inherited) {\n    add('dmarc_inherited', 'note', 'No DMARC record at this subdomain: the policy comes from ' + d.dmarc_name + '.',\n      'That is how DMARC works for subdomains.',\n      'Nothing to do unless this subdomain needs its own policy.');\n  }\n}\n\n// ---- MX: can this domain receive replies and bounces ----\nif (!realMx.length) {\n  add('mx_missing', 'warning', 'This domain cannot receive email (no MX record).',\n    'Replies and bounces sent to an address on this domain are lost.',\n    'Use a From and Reply-To address on a domain that receives email, or add MX records.');\n}\n\n// ---- DKIM: the signature that proves a message was not altered ----\nif (!d.dkim.length) {\n  add('dkim_not_checked', 'note', 'DKIM was not checked: no selector is listed for this domain.',\n    'A DKIM key cannot be found from outside without its selector name.',\n    'Open a real email from this domain, find s= in the DKIM-Signature header and add it to dkim_selectors.');\n}\nfor (const key of d.dkim) {\n  if (!key.found) {\n    add('dkim_selector_missing', 'blocker', 'No DKIM key at selector \"' + key.selector + '\".',\n      'Messages signed with this selector fail DKIM, so DMARC can fail too.',\n      'Publish the DKIM record your email tool gives you, or correct the selector name.');\n  } else if (key.revoked) {\n    add('dkim_key_revoked', 'blocker', 'The DKIM key at selector \"' + key.selector + '\" is empty (revoked).',\n      'Messages signed with this selector fail DKIM.',\n      'Publish the current key from your email tool.');\n  }\n}\n\n// A failed lookup gives no verdict: it must never look like a missing record.\nconst has = (level) => findings.some((f) => f.level === level);\nconst status = d.lookup_errors.length ? 'ERROR' : has('blocker') ? 'FAIL' : has('warning') ? 'WARN' : 'PASS';\n\nreturn {\n  json: {\n    domain: d.domain,\n    label: d.label,\n    status,\n    dmarc_stage: d.lookup_errors.length ? 'unknown' : stage,\n    findings: d.lookup_errors.length\n      ? [{ code: 'lookup_failed', level: 'note', issue: 'DNS lookup failed (' + d.lookup_errors[0] + ').', plain: 'No verdict this run: the records could not be read.', fix: 'Nothing to do; the next run tries again.' }]\n      : findings,\n    spf,\n    spf_lookups: d.spf_lookups,\n    dmarc,\n    dmarc_name: d.dmarc_name,\n    mailbox_provider: mailbox,\n    senders,\n    other_includes: otherIncludes,\n    dkim_checked: d.dkim.map((k) => k.selector),\n    checked_at: d.checked_at,\n  },\n};"
+      },
+      "notes": "Fixed rules, no AI. Each finding carries the issue, what it means in plain words and the fix. FAIL = a blocker, WARN = warnings only, ERROR = DNS could not be read."
+    },
+    {
+      "id": "6",
+      "name": "Compare With Last Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Remembers each domain's last verdict in the workflow's own storage, so the alert fires only on change.\n// ponytail: this memory lives in the n8n instance; move it to a sheet or database to share it across instances.\nconst store = $getWorkflowStaticData('global');\nstore.domains = store.domains || {};\nconst rank = { PASS: 0, WARN: 1, FAIL: 2 };\n\nreturn $input.all().map(({ json: now }) => {\n  const before = store.domains[now.domain];\n  const print = JSON.stringify([now.status, now.findings.map((f) => f.code).sort(), now.spf, now.dmarc]);\n  let change = 'same';\n  if (now.status === 'ERROR') change = 'unknown'; // a failed lookup never overwrites the last verdict\n  else if (!before) change = 'new';\n  else if (before.print !== print) {\n    change = rank[now.status] > rank[before.status] ? 'worse' : rank[now.status] < rank[before.status] ? 'better' : 'changed';\n  }\n  if (now.status !== 'ERROR') store.domains[now.domain] = { status: now.status, print };\n  return { json: { ...now, change, previous_status: before ? before.status : null } };\n});"
+      },
+      "notes": "Compares each verdict with the previous run (kept in the workflow's static data on scheduled runs): new, same, worse, better or changed."
+    },
+    {
+      "id": "7",
+      "name": "Build Digest and Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Writes two Slack messages: the digest of every domain, and an alert only for what needs attention now.\nconst rows = $input.all().map((item) => item.json);\nconst count = (status) => rows.filter((r) => r.status === status).length;\nconst icon = { FAIL: ':red_circle:', WARN: ':large_yellow_circle:', PASS: ':large_green_circle:', ERROR: ':white_circle:' };\nconst problems = (r) => r.findings.filter((f) => f.level !== 'note');\n\nconst digest = [\n  '*Sender domain health* (' + new Date().toISOString().slice(0, 10) + '): ' + rows.length + ' domain' + (rows.length === 1 ? '' : 's') + ' checked',\n  count('FAIL') + ' failing, ' + count('WARN') + ' with warnings, ' + count('PASS') + ' passing' + (count('ERROR') ? ', ' + count('ERROR') + ' not readable' : ''),\n  ...rows.map((r) =>\n    [icon[r.status] + ' *' + r.domain + '* ' + r.status + (r.label ? ' (' + r.label + ')' : '') + ' | DMARC: ' + r.dmarc_stage + ' | SPF lookups: ' + r.spf_lookups + '/10',\n      ...(r.status === 'ERROR' ? r.findings : problems(r)).map((f) => '      - ' + f.issue),\n    ].join('\\n')),\n].join('\\n');\n\n// Alert on: a domain that got worse, a first check that already fails, or records edited since the last run.\nconst urgent = rows.filter((r) => r.change === 'worse' || r.change === 'changed' || (r.change === 'new' && r.status === 'FAIL'));\nconst alert = urgent.map((r) => {\n  const head = r.change === 'worse' ? 'went from ' + r.previous_status + ' to ' + r.status\n    : r.change === 'changed' ? 'has different DNS records than last run (still ' + r.status + ')'\n    : 'fails on its first check';\n  return ['*' + r.domain + '* ' + head,\n    ...problems(r).map((f) => '- ' + f.issue + '\\n   _What it means:_ ' + f.plain + '\\n   _Fix:_ ' + f.fix),\n  ].join('\\n');\n}).join('\\n\\n');\n\nreturn [{\n  json: {\n    digest,\n    alert: alert ? ':rotating_light: *Sender domain alert*\\n' + alert : '',\n    needs_alert: urgent.length > 0,\n    checked: rows.length,\n    failing: count('FAIL'),\n    warnings: count('WARN'),\n    passing: count('PASS'),\n    unreadable: count('ERROR'),\n  },\n}];"
+      },
+      "notes": "One digest for every run, and an alert text only when a domain got worse, fails on first check or had its records edited."
+    },
+    {
+      "id": "8",
+      "name": "Slack: Weekly Digest (#email-health)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1720,
+        180
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#email-health",
+          "mode": "name"
+        },
+        "text": "={{ $json.digest }}",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post"
+      },
+      "notes": "Every run: one line per domain with its warnings and blockers."
+    },
+    {
+      "id": "9",
+      "name": "Guard: Anything Needs Attention?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a1",
+              "leftValue": "={{ $json.needs_alert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Yes only when something changed for the worse, so the alert channel stays worth reading."
+    },
+    {
+      "id": "10",
+      "name": "Slack: Alert on Change (#martech-alerts)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        400
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#martech-alerts",
+          "mode": "name"
+        },
+        "text": "={{ $json.alert }}",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post"
+      },
+      "notes": "What changed, what it means and how to fix it."
+    }
+  ],
+  "connections": {
+    "Schedule: Every Monday 08:00": {
+      "main": [
+        [
+          {
+            "node": "Domains to Watch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual: Run Now": {
+      "main": [
+        [
+          {
+            "node": "Domains to Watch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Domains to Watch": {
+      "main": [
+        [
+          {
+            "node": "DNS Lookups (Public DNS, No Credentials)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DNS Lookups (Public DNS, No Credentials)": {
+      "main": [
+        [
+          {
+            "node": "Rules: Grade the Domain (No AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rules: Grade the Domain (No AI)": {
+      "main": [
+        [
+          {
+            "node": "Compare With Last Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare With Last Run": {
+      "main": [
+        [
+          {
+            "node": "Build Digest and Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest and Alert": {
+      "main": [
+        [
+          {
+            "node": "Slack: Weekly Digest (#email-health)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Guard: Anything Needs Attention?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard: Anything Needs Attention?": {
+      "main": [
+        [
+          {
+            "node": "Slack: Alert on Change (#martech-alerts)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  }
+}

@@ -1,5 +1,7 @@
 # Never commit real customer exports or generated lists (PII)
 data/*.csv
+# ...except the anonymised DNS sample: public DNS facts, no names, no personal data
+!data/italian-b2b-sample-*.csv
 reports/*.csv
 reports/sync_report.json
 build/

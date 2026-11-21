@@ -1,5 +1,5 @@
 {
-  "name": "Error Notifier — Email Pre-Flight QA (#martech-alerts)",
+  "name": "Error Notifier — Sender Domain Health (#martech-alerts)",
   "nodes": [
     {
       "id": "1",
@@ -11,7 +11,7 @@
         260
       ],
       "parameters": {},
-      "notes": "Link this standalone workflow under Settings -> Error Workflow inside ai-email-preflight-qa.n8n.json."
+      "notes": "Link this standalone workflow under Settings -> Error Workflow inside sender-domain-health.n8n.json."
     },
     {
       "id": "2",
@@ -29,7 +29,7 @@
           "value": "#martech-alerts",
           "mode": "name"
         },
-        "text": "=:warning: *Email Pre-Flight QA Failed:* `{{ $json.workflow.name }}`\n*Node:* `{{ $json.execution.lastNodeExecuted }}`\n*Error:* {{ $json.execution.error.message }}\n*Execution URL:* {{ $json.execution.url }}",
+        "text": "=:warning: *Sender Domain Health failed:* `{{ $json.workflow.name }}`\n*Node:* `{{ $json.execution.lastNodeExecuted }}`\n*Error:* {{ $json.execution.error.message }}\n*Execution URL:* {{ $json.execution.url }}",
         "otherOptions": {},
         "resource": "message",
         "operation": "post"
