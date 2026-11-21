@@ -56,6 +56,10 @@ h2 { font-stretch: 72%; font-weight: 760; font-size: clamp(34px, 4vw, 54px); lin
 .nav-links { display: flex; gap: 24px; margin-left: auto; font-size: 15px; white-space: nowrap; }
 .nav-links a { text-decoration: none; color: var(--ink-2); }
 .nav-links a:hover { color: var(--accent); }
+.lang-switch { display: inline-flex; padding: 2px; border: 1.5px solid var(--ink); border-radius: var(--r); background: var(--panel); gap: 2px; flex-shrink: 0; }
+.lang-switch button { font: 600 12px/1 var(--mono); padding: 6px 9px; border: 0; border-radius: 2px; background: transparent; color: var(--muted); cursor: pointer; transition: background .15s, color .15s; }
+.lang-switch button:hover { color: var(--ink); }
+.lang-switch button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
 
 /* hero */
 .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; padding-top: 64px; padding-bottom: 72px; align-items: center; }
@@ -229,6 +233,7 @@ footer a:hover { color: var(--accent); }
 }
 @media (max-width: 720px) {
   .wrap { padding-left: 18px; padding-right: 18px; }
+  .nav .wrap { gap: 12px; }
   .hero { padding-top: 40px; }
   .cases, .files, .never, .evs, .gate .checks { grid-template-columns: minmax(0, 1fr); }
   .rail { margin-top: 56px; }
@@ -248,92 +253,96 @@ footer a:hover { color: var(--accent); }
 <header class="nav"><div class="wrap">
   <a class="brand" href="#top">CRM <span>pre-send QA</span></a>
   <nav class="nav-links" aria-label="Projects">
-    <a class="proj" href="https://errer441122.github.io/ai-visibility-audit-geo/">GEO audit</a>
-    <a class="proj" href="https://errer441122.github.io/ai-inbound-lead-router/">Lead router</a>
-    <a class="proj" href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>
-    <a href="https://github.com/errer441122/lifecycle-automation-lab">GitHub repo</a>
+    <a class="proj" href="https://errer441122.github.io/ai-visibility-audit-geo/" data-i18n="nav_geo">GEO audit</a>
+    <a class="proj" href="https://errer441122.github.io/ai-inbound-lead-router/" data-i18n="nav_lead">Lead router</a>
+    <a class="proj" href="https://errer441122.github.io/cx-crm-promo-guard/" data-i18n="nav_cx">CX promo guard</a>
+    <a href="https://github.com/errer441122/lifecycle-automation-lab" data-i18n="nav_repo">GitHub repo</a>
   </nav>
+  <div class="lang-switch" role="group" aria-label="Language">
+    <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    <button type="button" data-lang="it" aria-pressed="false">IT</button>
+  </div>
 </div></header>
 
 <main id="top">
   <section class="wrap hero">
     <div>
       <p class="eyebrow">Klaviyo + Shopify + n8n</p>
-      <h1>Catch broken emails before they ship.</h1>
-      <p class="lede">An n8n gate checks every draft against store policy, with rules from Klaviyo, Shopify and DNS traps found in live tests.</p>
+      <h1 data-i18n="hero_h1">Catch broken emails before they ship.</h1>
+      <p class="lede" data-i18n="hero_lede">An n8n gate checks every draft against store policy, with rules from Klaviyo, Shopify and DNS traps found in live tests.</p>
       <div class="ctas">
-        <a class="btn" href="#qa">Try the QA gate</a>
-        <a class="btn ghost" id="dl" href="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/workflows/ai-email-preflight-qa.n8n.json" download="ai-email-preflight-qa.n8n.json">Download the workflow</a>
+        <a class="btn" href="#qa" data-i18n="cta_try">Try the QA gate</a>
+        <a class="btn ghost" id="dl" href="https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/workflows/ai-email-preflight-qa.n8n.json" download="ai-email-preflight-qa.n8n.json" data-i18n="cta_dl">Download the workflow</a>
       </div>
     </div>
-    <figure class="hero-card" aria-label="Example: a win-back draft the gate blocks">
+    <figure class="hero-card" id="hero-card" aria-label="Example: a win-back draft the gate blocks">
       <div class="mail" id="hero-mail"></div>
       <figcaption class="stamp" id="hero-stamp"></figcaption>
     </figure>
   </section>
 
   <section class="wrap band" id="qa">
-    <h2>Three drafts through the gate</h2>
-    <p class="sub2">The checks and the JSON verdict follow <code>prompts/email-policy-qa-prompt.md</code>; the Slack text comes from the workflow file. The drafts are examples.</p>
+    <h2 data-i18n="qa_h2">Three drafts through the gate</h2>
+    <p class="sub2" data-i18n-html="qa_sub">The checks and the JSON verdict follow <code>prompts/email-policy-qa-prompt.md</code>; the Slack text comes from the workflow file. The drafts are examples.</p>
     <div class="drafts" role="tablist" aria-label="Email drafts" id="tabs"></div>
     <div class="qa" role="tabpanel" id="qa-panel" aria-live="polite">
-      <div><h3>What the subscriber would get</h3><div class="mail" id="mail"></div></div>
-      <div><h3>What the gate returns</h3><div id="result"></div></div>
+      <div><h3 data-i18n="qa_left">What the subscriber would get</h3><div class="mail" id="mail"></div></div>
+      <div><h3 data-i18n="qa_right">What the gate returns</h3><div id="result"></div></div>
     </div>
   </section>
 
   <section class="wrap band" id="field">
-    <h2>Four things that broke for real</h2>
-    <p class="sub2">Found while authenticating <code>send.negozio-online.org</code> and running the flows. Logs and screenshots are from <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">the field notes</a>.</p>
+    <h2 data-i18n="field_h2">Four things that broke for real</h2>
+    <p class="sub2" data-i18n-html="field_sub">Found while authenticating <code>send.negozio-online.org</code> and running the flows. Logs and screenshots are from <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">the field notes</a>.</p>
     <div class="cases">
       <article class="case">
-        <h3>Smart Sending ate the first cart email</h3>
-        <p>A welcome email had gone out under five hours earlier, so Klaviyo skipped email 2.1. No error, no alert: one screen says why.</p>
+        <h3 data-i18n="c1_h3">Smart Sending ate the first cart email</h3>
+        <p data-i18n="c1_p">A welcome email had gone out under five hours earlier, so Klaviyo skipped email 2.1. No error, no alert: one screen says why.</p>
         <pre class="term"><span class="d">17:47</span>  Received Email   "Benvenuto in Torrefazione Nord"
 <span class="d">18:45</span>  Checkout Started
 <span class="d">22:45</span>  2.1 due  ->  Delivered 0, Skipped 1
        <span class="hl">"Skipped: Smart Sending (1)"</span></pre>
         <button type="button" class="thumb" data-full="assets/flow-abandoned-cart.png" aria-label="Enlarge the Klaviyo abandoned cart flow"><img src="assets/flow-abandoned-cart.png" alt="The live Klaviyo abandoned cart flow: wait 4 hours, email 2.1, wait 20 hours, email 2.2, wait 2 days, email 2.3" loading="lazy" width="1800" height="1067" style="transform:scale(2.4);transform-origin:56% 36%"></button>
-        <p class="rule"><b>Rule:</b> Smart Sending off on abandoned cart, on for newsletters.</p>
+        <p class="rule" data-i18n-html="c1_rule"><b>Rule:</b> Smart Sending off on abandoned cart, on for newsletters.</p>
       </article>
       <article class="case">
-        <h3>Double opt-in did not protect the list</h3>
-        <p>A sign-up through Shopify's newsletter field landed as subscribed 86 milliseconds after the webhook. No confirmation email was ever sent.</p>
+        <h3 data-i18n="c2_h3">Double opt-in did not protect the list</h3>
+        <p data-i18n="c2_p">A sign-up through Shopify's newsletter field landed as subscribed 86 milliseconds after the webhook. No confirmation email was ever sent.</p>
         <pre class="term">consent            <span class="hl">SUBSCRIBED</span>
 method             SHOPIFY / Customer Webhook
 webhook event      <span class="d">15:30:36.569</span>
 consent_timestamp  <span class="d">15:30:36.655</span></pre>
         <button type="button" class="thumb" data-full="assets/klaviyo-double-optin.png" aria-label="Enlarge the Klaviyo list settings"><img src="assets/klaviyo-double-optin.png" alt="Klaviyo list settings with double opt-in selected" loading="lazy" width="1800" height="810" style="transform:scale(1.9);transform-origin:56% 42%"></button>
-        <p class="rule"><b>Rule:</b> keep consent source and timestamp on every profile (GDPR art. 7(1)) and audit for single opt-in leaks.</p>
+        <p class="rule" data-i18n-html="c2_rule"><b>Rule:</b> keep consent source and timestamp on every profile (GDPR art. 7(1)) and audit for single opt-in leaks.</p>
       </article>
       <article class="case">
-        <h3>A green "Verified" was someone else's wildcard</h3>
-        <p>The first domain was parked on Afternic, whose zone answers every TXT query. Klaviyo asked for <code>_dmarc</code>, the wildcard replied and the check went green.</p>
+        <h3 data-i18n="c3_h3">A green "Verified" was someone else's wildcard</h3>
+        <p data-i18n-html="c3_p">The first domain was parked on Afternic, whose zone answers every TXT query. Klaviyo asked for <code>_dmarc</code>, the wildcard replied and the check went green.</p>
         <pre class="term"><span class="d">$</span> nslookup -type=TXT mionegozio.com
 mionegozio.com          text = <span class="hl">"v=spf1 -all"</span>
 <span class="d">$</span> nslookup -type=TXT _dmarc.mionegozio.com
 _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
         <button type="button" class="thumb" data-full="assets/dns-auth.png" aria-label="Enlarge the DNS lookups for the real sending domain"><img src="assets/dns-auth.png" alt="nslookup output for send.negozio-online.org: Klaviyo nameservers, DKIM CNAME and DMARC record" loading="lazy" width="1018" height="430"></button>
-        <p class="rule"><b>Rule:</b> verify SPF, DKIM and DMARC in public DNS, never on a dashboard tick.</p>
+        <p class="rule" data-i18n-html="c3_rule"><b>Rule:</b> verify SPF, DKIM and DMARC in public DNS, never on a dashboard tick.</p>
       </article>
       <article class="case tint">
-        <h3>Good copy promised what the store cannot do</h3>
-        <p>Drafts passed a manual read while promising shipping times and a coupon expiry the store does not offer.</p>
+        <h3 data-i18n="c4_h3">Good copy promised what the store cannot do</h3>
+        <p data-i18n="c4_p">Drafts passed a manual read while promising shipping times and a coupon expiry the store does not offer.</p>
         <div class="vs">
-          <div><small>the draft said</small><s>"spedizione garantita in 48 ore"</s></div>
-          <div><small>store policy says</small><code>published_shipping_sla: null</code></div>
-          <div><small>the draft said</small><s>"valido solo 14 giorni"</s></div>
-          <div><small>store policy says</small><code>supports_per_recipient_expiry: false</code></div>
+          <div><small data-i18n="vs_draft">the draft said</small><s>"spedizione garantita in 48 ore"</s></div>
+          <div><small data-i18n="vs_policy">store policy says</small><code>published_shipping_sla: null</code></div>
+          <div><small data-i18n="vs_draft">the draft said</small><s>"valido solo 14 giorni"</s></div>
+          <div><small data-i18n="vs_policy">store policy says</small><code>supports_per_recipient_expiry: false</code></div>
         </div>
-        <p class="rule"><b>Rule:</b> every draft goes through the <a href="#qa">pre-send gate</a> against <code>config/store-facts-and-promo-policy.json</code>.</p>
+        <p class="rule" data-i18n-html="c4_rule"><b>Rule:</b> every draft goes through the <a href="#qa">pre-send gate</a> against <code>config/store-facts-and-promo-policy.json</code>.</p>
       </article>
     </div>
   </section>
 
   <section class="wrap band" id="run">
-    <p class="eyebrow">31 August 2026, one subscriber</p>
-    <h2>From a profile property to an inbox in 17 minutes</h2>
-    <p class="sub2">A sync script from an earlier version of this lab wrote the lifecycle stage to the Klaviyo profile. Klaviyo only reads the property, and the win-back flow fires. The run is documented in the field notes.</p>
+    <p class="eyebrow" data-i18n="run_eye">31 August 2026, one subscriber</p>
+    <h2 data-i18n="run_h2">From a profile property to an inbox in 17 minutes</h2>
+    <p class="sub2" data-i18n="run_sub">A sync script from an earlier version of this lab wrote the lifecycle stage to the Klaviyo profile. Klaviyo only reads the property, and the win-back flow fires. The run is documented in the field notes.</p>
     <div class="run">
       <div class="rail" aria-hidden="true">
         <span class="ev first" style="left:0%"><time>12:55:00</time></span>
@@ -345,37 +354,37 @@ _dmarc.mionegozio.com   text = <span class="hl">"v=spf1 -all"</span></pre>
         <span class="ev last" style="left:100%"><time>13:15:27</time></span>
       </div>
       <div class="evs">
-        <div><b>Sync writes the stage</b><p><code>lifecycle_stage = "At risk"</code> on the profile, only because consent was on record.</p></div>
-        <div><b>Segment picks it up</b><p>"At risk (lifecycle_stage)" re-indexes: 1 profile.</p></div>
-        <div><b>Win-back 3.1 delivered</b><p>"E passato un po. Il tuo caffe ti aspetta".</p></div>
-        <div><b>Opened</b><p>One open, on a real client. A count, not a rate.</p></div>
+        <div data-i18n-html="ev1"><b>Sync writes the stage</b><p><code>lifecycle_stage = "At risk"</code> on the profile, only because consent was on record.</p></div>
+        <div data-i18n-html="ev2"><b>Segment picks it up</b><p>"At risk (lifecycle_stage)" re-indexes: 1 profile.</p></div>
+        <div data-i18n-html="ev3"><b>Win-back 3.1 delivered</b><p>"E passato un po. Il tuo caffe ti aspetta".</p></div>
+        <div data-i18n-html="ev4"><b>Opened</b><p>One open, on a real client. A count, not a rate.</p></div>
       </div>
-      <p class="small">The sync ran with the reference date pinned to 15 December, so the August order counted as 107 days old; the field notes disclose it. The segment delay varies between runs and is not a constant.</p>
+      <p class="small" data-i18n="run_note">The sync ran with the reference date pinned to 15 December, so the August order counted as 107 days old; the field notes disclose it. The segment delay varies between runs and is not a constant.</p>
     </div>
   </section>
 
   <section class="wrap band" id="margin">
-    <h2>Who gets a discount, by days since the last order</h2>
-    <p class="sub2">From <code>docs/vip-margin-protection-rules.md</code>. A blanket discount is mostly paid by customers who would have bought at full price.</p>
+    <h2 data-i18n="margin_h2">Who gets a discount, by days since the last order</h2>
+    <p class="sub2" data-i18n-html="margin_sub">From <code>docs/vip-margin-protection-rules.md</code>. A blanket discount is mostly paid by customers who would have bought at full price.</p>
     <div class="ruler">
       <div class="band-row" aria-hidden="true"><div class="zone"></div><div class="zone"></div><div class="zone yes"></div><div class="zone yes"></div><div class="zone sunset"></div></div>
       <div class="days" aria-hidden="true"><span>0</span><span>15</span><span>91</span><span>181</span><span>365+</span></div>
       <div class="labels">
-        <div><b>Recent buyer</b>0-14 days. Post-purchase care, no coupon.</div>
-        <div><b>New buyer</b>15-90 days. A nudge first, offers only after day 90.</div>
-        <div class="y"><b>At risk</b>91-180 days. One win-back offer, <code>TORNA15</code>, once.</div>
-        <div class="y"><b>Dormant</b>181-365 days. One final offer, then sunset.</div>
-        <div><b>Unengaged</b>Over 365 days. Suppressed to protect the sender.</div>
+        <div data-i18n-html="lbl1"><b>Recent buyer</b>0-14 days. Post-purchase care, no coupon.</div>
+        <div data-i18n-html="lbl2"><b>New buyer</b>15-90 days. A nudge first, offers only after day 90.</div>
+        <div class="y" data-i18n-html="lbl3"><b>At risk</b>91-180 days. One win-back offer, <code>TORNA15</code>, once.</div>
+        <div class="y" data-i18n-html="lbl4"><b>Dormant</b>181-365 days. One final offer, then sunset.</div>
+        <div data-i18n-html="lbl5"><b>Unengaged</b>Over 365 days. Suppressed to protect the sender.</div>
       </div>
       <div class="never">
-        <h3>Never, whatever the date</h3>
+        <h3 data-i18n="never_h3">Never, whatever the date</h3>
         <div>
           <ul>
-            <li><b>VIP and Champions:</b> 3 or more orders, or the top 20% by spend.</li>
-            <li><b>Full-price repeat buyers:</b> 2 or more orders, never used a coupon.</li>
-            <li><b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>.</li>
+            <li data-i18n-html="never_1"><b>VIP and Champions:</b> 3 or more orders, or the top 20% by spend.</li>
+            <li data-i18n-html="never_2"><b>Full-price repeat buyers:</b> 2 or more orders, never used a coupon.</li>
+            <li data-i18n-html="never_3"><b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>.</li>
           </ul>
-          <pre class="seg-def">Klaviyo segment "Exclusion: Protect Full-Price Margin"
+          <pre class="seg-def" data-i18n="seg_def">Klaviyo segment "Exclusion: Protect Full-Price Margin"
   Placed Order at least 3 times over all time
   OR Placed Order at least once in the last 14 days
 
@@ -386,41 +395,41 @@ Also under "Don't send to": segment "CX hold active"</pre>
   </section>
 
   <section class="wrap band" id="gate">
-    <h2>The gate itself</h2>
-    <p class="sub2">Code checks what has one right answer. The AI only reads the copy against the store's facts and the exclusions.</p>
+    <h2 data-i18n="gate_h2">The gate itself</h2>
+    <p class="sub2" data-i18n="gate_sub">Code checks what has one right answer. The AI only reads the copy against the store's facts and the exclusions.</p>
     <div class="gate">
       <ol class="checks">
-        <li><div><b>Personalisation fallbacks<span class="by">rule</span></b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span></div></li>
-        <li><div><b>Links and GA4 UTMs<span class="by">rule</span></b><span>https links with lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code>.</span></div></li>
-        <li><div><b>Mobile and deliverability basics<span class="by">rule</span></b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span></div></li>
-        <li><div><b>Copy against store policy<span class="by ai">AI</span></b><span>No shipping times the checkout does not publish, no expiry on a static code.</span></div></li>
-        <li><div><b>Discount exclusions<span class="by ai">AI</span></b><span>VIPs, recent buyers and customers in CX hold active excluded whenever a discount appears.</span></div></li>
+        <li><div data-i18n-html="chk1"><b>Personalisation fallbacks<span class="by">rule</span></b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span></div></li>
+        <li><div data-i18n-html="chk2"><b>Links and GA4 UTMs<span class="by">rule</span></b><span>https links with lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code>.</span></div></li>
+        <li><div data-i18n-html="chk3"><b>Mobile and deliverability basics<span class="by">rule</span></b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span></div></li>
+        <li><div data-i18n-html="chk4"><b>Copy against store policy<span class="by ai">AI</span></b><span>No shipping times the checkout does not publish, no expiry on a static code.</span></div></li>
+        <li><div data-i18n-html="chk5"><b>Discount exclusions<span class="by ai">AI</span></b><span>VIPs, recent buyers and customers in CX hold active excluded whenever a discount appears.</span></div></li>
       </ol>
-      <div class="graphbox"><div class="canvas" id="canvas"><p class="graph-msg">Loading the workflow file...</p></div></div>
+      <div class="graphbox"><div class="canvas" id="canvas"><p class="graph-msg" data-i18n="graph_loading">Loading the workflow file...</p></div></div>
     </div>
   </section>
 
   <section class="wrap band" id="files">
-    <h2>The files</h2>
+    <h2 data-i18n="files_h2">The files</h2>
     <div class="files">
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go">open</span><span class="d">The pre-send workflow and the standalone error-notifier.n8n.json, ready to import</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/config/store-facts-and-promo-policy.json"><span class="p">config/store-facts-and-promo-policy.json</span><span class="go">open</span><span class="d">The store's truth table the gate reads</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/prompts/email-policy-qa-prompt.md"><span class="p">prompts/email-policy-qa-prompt.md</span><span class="go">open</span><span class="d">What the AI checks, and what the rules check</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/vip-margin-protection-rules.md"><span class="p">docs/vip-margin-protection-rules.md</span><span class="go">open</span><span class="d">Who gets a discount and who does not</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/sop-pre-send-qa-checklist.md"><span class="p">docs/sop-pre-send-qa-checklist.md</span><span class="go">open</span><span class="d">One-page checklist before any send</span></a>
-      <a href="https://github.com/errer441122/lifecycle-automation-lab/tree/main/docs/field-notes"><span class="p">docs/field-notes/</span><span class="go">open</span><span class="d">The full Klaviyo, Shopify and DNS notes</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json"><span class="p">workflows/ai-email-preflight-qa.n8n.json</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f1_d">The pre-send workflow and the standalone error-notifier.n8n.json, ready to import</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/config/store-facts-and-promo-policy.json"><span class="p">config/store-facts-and-promo-policy.json</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f2_d">The store's truth table the gate reads</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/prompts/email-policy-qa-prompt.md"><span class="p">prompts/email-policy-qa-prompt.md</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f3_d">What the AI checks, and what the rules check</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/vip-margin-protection-rules.md"><span class="p">docs/vip-margin-protection-rules.md</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f4_d">Who gets a discount and who does not</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/sop-pre-send-qa-checklist.md"><span class="p">docs/sop-pre-send-qa-checklist.md</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f5_d">One-page checklist before any send</span></a>
+      <a href="https://github.com/errer441122/lifecycle-automation-lab/tree/main/docs/field-notes"><span class="p">docs/field-notes/</span><span class="go" data-i18n="open">open</span><span class="d" data-i18n="f6_d">The full Klaviyo, Shopify and DNS notes</span></a>
     </div>
-    <p class="honest">The Klaviyo account, the flows and the DNS records are real. They run on a Shopify development store with no real customers, which is why no open rates or revenue figures are claimed.</p>
+    <p class="honest" data-i18n="honest">The Klaviyo account, the flows and the DNS records are real. They run on a Shopify development store with no real customers, which is why no open rates or revenue figures are claimed.</p>
   </section>
 </main>
 
-<dialog id="lightbox"><img id="lightbox-img" src="" alt=""><button type="button" id="lightbox-close">Close</button></dialog>
+<dialog id="lightbox"><img id="lightbox-img" src="" alt=""><button type="button" id="lightbox-close" data-i18n="close">Close</button></dialog>
 
 <footer><div class="wrap">
   <span class="who">Riccardo Capanna</span>
-  <a href="https://errer441122.github.io/ai-visibility-audit-geo/">GEO audit</a>
-  <a href="https://errer441122.github.io/ai-inbound-lead-router/">Lead router</a>
-  <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>
+  <a href="https://errer441122.github.io/ai-visibility-audit-geo/" data-i18n="nav_geo">GEO audit</a>
+  <a href="https://errer441122.github.io/ai-inbound-lead-router/" data-i18n="nav_lead">Lead router</a>
+  <a href="https://errer441122.github.io/cx-crm-promo-guard/" data-i18n="nav_cx">CX promo guard</a>
   <a href="https://github.com/errer441122">GitHub</a>
   <a href="https://www.linkedin.com/in/riccardo-capanna-039a43415/">LinkedIn</a>
 </div></footer>
@@ -430,13 +439,227 @@ const BASE = location.hostname.endsWith("github.io")
   ? "https://raw.githubusercontent.com/errer441122/lifecycle-automation-lab/main/"
   : "../";
 
+const I18N = {
+  en: {
+    page_title: "CRM Pre-Send QA: live showcase",
+    nav_geo: "GEO audit",
+    nav_lead: "Lead router",
+    nav_cx: "CX promo guard",
+    nav_repo: "GitHub repo",
+    hero_h1: "Catch broken emails before they ship.",
+    hero_lede: "An n8n gate checks every draft against store policy, with rules from Klaviyo, Shopify and DNS traps found in live tests.",
+    cta_try: "Try the QA gate",
+    cta_dl: "Download the workflow",
+    hero_card_label: "Example: a win-back draft the gate blocks",
+    qa_h2: "Three drafts through the gate",
+    qa_sub: 'The checks and the JSON verdict follow <code>prompts/email-policy-qa-prompt.md</code>; the Slack text comes from the workflow file. The drafts are examples.',
+    qa_left: "What the subscriber would get",
+    qa_right: "What the gate returns",
+    field_h2: "Four things that broke for real",
+    field_sub: 'Found while authenticating <code>send.negozio-online.org</code> and running the flows. Logs and screenshots are from <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">the field notes</a>.',
+    c1_h3: "Smart Sending ate the first cart email",
+    c1_p: "A welcome email had gone out under five hours earlier, so Klaviyo skipped email 2.1. No error, no alert: one screen says why.",
+    c1_rule: "<b>Rule:</b> Smart Sending off on abandoned cart, on for newsletters.",
+    c2_h3: "Double opt-in did not protect the list",
+    c2_p: "A sign-up through Shopify's newsletter field landed as subscribed 86 milliseconds after the webhook. No confirmation email was ever sent.",
+    c2_rule: "<b>Rule:</b> keep consent source and timestamp on every profile (GDPR art. 7(1)) and audit for single opt-in leaks.",
+    c3_h3: 'A green "Verified" was someone else\'s wildcard',
+    c3_p: "The first domain was parked on Afternic, whose zone answers every TXT query. Klaviyo asked for <code>_dmarc</code>, the wildcard replied and the check went green.",
+    c3_rule: "<b>Rule:</b> verify SPF, DKIM and DMARC in public DNS, never on a dashboard tick.",
+    c4_h3: "Good copy promised what the store cannot do",
+    c4_p: "Drafts passed a manual read while promising shipping times and a coupon expiry the store does not offer.",
+    vs_draft: "the draft said",
+    vs_policy: "store policy says",
+    c4_rule: '<b>Rule:</b> every draft goes through the <a href="#qa">pre-send gate</a> against <code>config/store-facts-and-promo-policy.json</code>.',
+    run_eye: "31 August 2026, one subscriber",
+    run_h2: "From a profile property to an inbox in 17 minutes",
+    run_sub: "A sync script from an earlier version of this lab wrote the lifecycle stage to the Klaviyo profile. Klaviyo only reads the property, and the win-back flow fires. The run is documented in the field notes.",
+    ev1: '<b>Sync writes the stage</b><p><code>lifecycle_stage = "At risk"</code> on the profile, only because consent was on record.</p>',
+    ev2: '<b>Segment picks it up</b><p>"At risk (lifecycle_stage)" re-indexes: 1 profile.</p>',
+    ev3: '<b>Win-back 3.1 delivered</b><p>"E passato un po. Il tuo caffe ti aspetta".</p>',
+    ev4: "<b>Opened</b><p>One open, on a real client. A count, not a rate.</p>",
+    run_note: "The sync ran with the reference date pinned to 15 December, so the August order counted as 107 days old; the field notes disclose it. The segment delay varies between runs and is not a constant.",
+    margin_h2: "Who gets a discount, by days since the last order",
+    margin_sub: "From <code>docs/vip-margin-protection-rules.md</code>. A blanket discount is mostly paid by customers who would have bought at full price.",
+    lbl1: "<b>Recent buyer</b>0-14 days. Post-purchase care, no coupon.",
+    lbl2: "<b>New buyer</b>15-90 days. A nudge first, offers only after day 90.",
+    lbl3: "<b>At risk</b>91-180 days. One win-back offer, <code>TORNA15</code>, once.",
+    lbl4: "<b>Dormant</b>181-365 days. One final offer, then sunset.",
+    lbl5: "<b>Unengaged</b>Over 365 days. Suppressed to protect the sender.",
+    never_h3: "Never, whatever the date",
+    never_1: "<b>VIP and Champions:</b> 3 or more orders, or the top 20% by spend.",
+    never_2: "<b>Full-price repeat buyers:</b> 2 or more orders, never used a coupon.",
+    never_3: '<b>Active CX hold:</b> a stuck parcel, a 1-2 star review or an open ticket, set by the <a href="https://errer441122.github.io/cx-crm-promo-guard/">CX promo guard</a>.',
+    seg_def: 'Klaviyo segment "Exclusion: Protect Full-Price Margin"\n  Placed Order at least 3 times over all time\n  OR Placed Order at least once in the last 14 days\n\nAlso under "Don\'t send to": segment "CX hold active"',
+    gate_h2: "The gate itself",
+    gate_sub: "Code checks what has one right answer. The AI only reads the copy against the store's facts and the exclusions.",
+    chk1: '<b>Personalisation fallbacks<span class="by">rule</span></b><span>Klaviyo Liquid and HubSpot HubL tags with a missing or empty fallback.</span>',
+    chk2: '<b>Links and GA4 UTMs<span class="by">rule</span></b><span>https links with lowercase <code>utm_source</code>, <code>utm_medium=email</code> and <code>utm_campaign</code>.</span>',
+    chk3: '<b>Mobile and deliverability basics<span class="by">rule</span></b><span>Subject up to 50 characters, a preview text that adds something, the unsubscribe tag, image alt text.</span>',
+    chk4: '<b>Copy against store policy<span class="by ai">AI</span></b><span>No shipping times the checkout does not publish, no expiry on a static code.</span>',
+    chk5: '<b>Discount exclusions<span class="by ai">AI</span></b><span>VIPs, recent buyers and customers in CX hold active excluded whenever a discount appears.</span>',
+    graph_loading: "Loading the workflow file...",
+    graph_err: 'The workflow file did not load. <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json">Open it on GitHub</a>.',
+    files_h2: "The files",
+    open: "open",
+    f1_d: "The pre-send workflow and the standalone error-notifier.n8n.json, ready to import",
+    f2_d: "The store's truth table the gate reads",
+    f3_d: "What the AI checks, and what the rules check",
+    f4_d: "Who gets a discount and who does not",
+    f5_d: "One-page checklist before any send",
+    f6_d: "The full Klaviyo, Shopify and DNS notes",
+    honest: "The Klaviyo account, the flows and the DNS records are real. They run on a Shopify development store with no real customers, which is why no open rates or revenue figures are claimed.",
+    close: "Close",
+    by_rule: "rule",
+    lbl_from: "From",
+    lbl_subject: "Subject",
+    lbl_preview: "Preview",
+    lbl_chars: "characters",
+    lbl_phone_cut: ", a phone shows about 50",
+    lbl_empty: "(empty)",
+    lbl_sent_to: "Sent to",
+    lbl_excluded: "Excluded",
+    lbl_missing: ": missing",
+    verdict_pass: "PASS",
+    verdict_fail: "FAIL",
+    tag_blocker: "blocker",
+    tag_warning: "warning",
+    lbl_fix: "Fix:",
+    clean_msg: "No blockers and no warnings. The discount reaches only At risk customers, with the margin and CX-hold exclusions attached.",
+    note_pass: "PASS still means a live seed-inbox check before scheduling.",
+    note_fail: "Blockers stop the send: the draft goes back with the fix list.",
+    edge_pass: "pass",
+    edge_fail: "fail",
+    kind_ai: "ai call",
+    kind_err: "on error",
+    kind_code: "code",
+  },
+  it: {
+    page_title: "QA Pre-Invio Email CRM: showcase interattivo",
+    nav_geo: "Audit GEO",
+    nav_lead: "Router lead",
+    nav_cx: "Blocco promo CX",
+    nav_repo: "Repo GitHub",
+    hero_h1: "Ferma le email sbagliate prima dell'invio.",
+    hero_lede: "Un controllo automatico su n8n verifica ogni bozza rispetto alle regole del negozio, nato da errori reali di Klaviyo, Shopify e DNS trovati nei test dal vivo.",
+    cta_try: "Prova il controllo QA",
+    cta_dl: "Scarica il workflow",
+    hero_card_label: "Esempio: una bozza win-back bloccata dal controllo",
+    qa_h2: "Tre bozze passate al controllo",
+    qa_sub: 'I controlli e il verdetto seguono <code>prompts/email-policy-qa-prompt.md</code>; il messaggio Slack arriva direttamente dal file del workflow. Le bozze qui sotto sono esempi dimostrativi.',
+    qa_left: "Cosa riceverebbe il cliente",
+    qa_right: "Cosa risponde il controllo",
+    field_h2: "Quattro cose che si sono rotte davvero",
+    field_sub: 'Scoperte durante l\'autenticazione di <code>send.negozio-online.org</code> e i test reali dei flussi. Log e screenshot arrivano dalle <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/docs/field-notes/klaviyo-shopify-field-notes.md">note operative sul campo</a>.',
+    c1_h3: "Lo Smart Sending ha bloccato la prima email carrello",
+    c1_p: "Meno di cinque ore prima era partita un'email di benvenuto, quindi Klaviyo ha saltato l'email 2.1 del carrello abbandonato. Nessun errore, nessun avviso: lo si scopre solo in una schermata.",
+    c1_rule: "<b>Regola:</b> Smart Sending disattivato sul carrello abbandonato, attivo sulle newsletter.",
+    c2_h3: "Il double opt-in non ha protetto davvero la lista",
+    c2_p: "Un'iscrizione dal campo newsletter di Shopify è risultata attiva appena 86 millisecondi dopo il webhook, senza che partisse alcuna email di conferma.",
+    c2_rule: "<b>Regola:</b> salvare fonte e data/ora del consenso su ogni profilo (GDPR art. 7(1)) e controllare eventuali ingressi in single opt-in.",
+    c3_h3: 'Una spunta verde "Verificato" era un falso positivo DNS',
+    c3_p: "Il primo dominio era parcheggiato su Afternic, che risponde automaticamente a qualunque richiesta TXT. Klaviyo ha cercato <code>_dmarc</code>, il record jolly ha risposto e la verifica è diventata verde per sbaglio.",
+    c3_rule: "<b>Regola:</b> verificare sempre SPF, DKIM e DMARC nei DNS pubblici, mai fidarsi solo della spunta in dashboard.",
+    c4_h3: "Un buon testo prometteva cose che il negozio non fa",
+    c4_p: "Bozze che a occhio sembravano ottime promettevano tempi di consegna e scadenze coupon che il negozio non garantisce.",
+    vs_draft: "la bozza diceva",
+    vs_policy: "la policy del negozio dice",
+    c4_rule: '<b>Regola:</b> ogni bozza passa dal <a href="#qa">controllo pre-invio</a> confrontata con <code>config/store-facts-and-promo-policy.json</code>.',
+    run_eye: "31 agosto 2026, un iscritto reale",
+    run_h2: "Da una proprietà sul profilo alla casella email in 17 minuti",
+    run_sub: "Uno script di test della prima versione del laboratorio ha aggiornato lo stato del cliente sul profilo Klaviyo. Klaviyo legge solo quella proprietà e fa partire in automatico il flusso Win-Back. Il test è documentato nelle note sul campo.",
+    ev1: '<b>Aggiornamento stato</b><p>Impostato <code>lifecycle_stage = "At risk"</code> sul profilo, solo perché risultava un consenso valido.</p>',
+    ev2: '<b>Il segmento lo rileva</b><p>Il segmento "At risk (lifecycle_stage)" si aggiorna: 1 profilo trovato.</p>',
+    ev3: '<b>Email Win-Back 3.1 consegnata</b><p>"È passato un po\'. Il tuo caffè ti aspetta".</p>',
+    ev4: "<b>Aperta</b><p>Una singola apertura su una casella reale. Un conteggio verificato, non una percentuale gonfiata.</p>",
+    run_note: "Il test ha simulato la data del 15 dicembre così da far risultare l'ordine di agosto vecchio di 107 giorni (tutto dichiarato nelle note). Il tempo di aggiornamento del segmento varia da un test all'altro.",
+    margin_h2: "Chi riceve uno sconto, in base ai giorni dall'ultimo ordine",
+    margin_sub: "Da <code>docs/vip-margin-protection-rules.md</code>. Uno sconto inviato a tutti finisce soprattutto a clienti che avrebbero comprato comunque a prezzo pieno.",
+    lbl1: "<b>Acquirente recente</b>0-14 giorni. Solo cura post-acquisto, nessun coupon.",
+    lbl2: "<b>Nuovo acquirente</b>15-90 giorni. Prima un promemoria gentile, sconti solo dopo il 90° giorno.",
+    lbl3: "<b>A rischio</b>91-180 giorni. Una sola offerta di recupero, <code>TORNA15</code>, una volta sola.",
+    lbl4: "<b>Inattivo</b>181-365 giorni. Un'ultima proposta, poi stop agli invii.",
+    lbl5: "<b>Disinteressato</b>Oltre 365 giorni. Escluso per proteggere la reputazione del dominio.",
+    never_h3: "Mai scontati, qualunque sia la data",
+    never_1: "<b>VIP e clienti migliori:</b> 3 o più ordini, oppure il 20% che spende di più.",
+    never_2: "<b>Clienti abituali a prezzo pieno:</b> 2 o più ordini senza aver mai usato un coupon.",
+    never_3: '<b>Blocco assistenza attivo (CX hold):</b> pacco bloccato, recensione 1-2 stelle o ticket aperto, gestito da <a href="https://errer441122.github.io/cx-crm-promo-guard/">Blocco promo CX</a>.',
+    seg_def: 'Segmento Klaviyo "Exclusion: Protect Full-Price Margin"\n  Ordine completato almeno 3 volte in totale\n  OPPURE Ordine completato almeno 1 volta negli ultimi 14 giorni\n\nInoltre sotto "Non inviare a": segmento "CX hold active"',
+    gate_h2: "Come funziona il controllo",
+    gate_sub: "Le regole fisse verificano ciò che ha una sola risposta esatta. L'AI legge il testo solo per confrontarlo con le regole del negozio e le esclusioni.",
+    chk1: '<b>Tag di personalizzazione<span class="by">regola</span></b><span>Segnaposto Klaviyo o HubSpot senza testo di riserva (che generano "Ciao ,").</span>',
+    chk2: '<b>Link e parametri UTM GA4<span class="by">regola</span></b><span>Link HTTPS con <code>utm_source</code>, <code>utm_medium=email</code> e <code>utm_campaign</code> in minuscolo.</span>',
+    chk3: '<b>Leggibilità mobile e recapito<span class="by">regola</span></b><span>Oggetto entro 50 caratteri, testo di anteprima utile, link di disiscrizione e testo alternativo immagini.</span>',
+    chk4: '<b>Testo rispetto alle policy<span class="by ai">AI</span></b><span>Nessuna consegna promessa se non garantita dal negozio, nessuna scadenza finta su codici fissi.</span>',
+    chk5: '<b>Esclusioni sugli sconti<span class="by ai">AI</span></b><span>VIP, acquirenti recenti e clienti con blocco assistenza esclusi ogni volta che c\'è un coupon.</span>',
+    graph_loading: "Caricamento del file workflow...",
+    graph_err: 'Impossibile caricare il file workflow. <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json">Aprilo su GitHub</a>.',
+    files_h2: "I file del progetto",
+    open: "apri",
+    f1_d: "Il workflow di controllo pre-invio e il gestore errori separato error-notifier.n8n.json, pronti da importare",
+    f2_d: "La scheda ufficiale delle regole del negozio letta dal controllo",
+    f3_d: "Cosa controlla l'AI e cosa controllano le regole fisse",
+    f4_d: "Chi può ricevere uno sconto e chi viene sempre escluso",
+    f5_d: "Checklist operativa di una pagina prima di ogni invio",
+    f6_d: "Tutte le note complete sui test Klaviyo, Shopify e DNS",
+    honest: "L'account Klaviyo, i flussi e i record DNS sono reali. Girano su un negozio Shopify di test senza clienti veri, ed è per questo che non vengono dichiarati tassi di apertura o ricavi inventati.",
+    close: "Chiudi",
+    by_rule: "regola",
+    lbl_from: "Da",
+    lbl_subject: "Oggetto",
+    lbl_preview: "Anteprima",
+    lbl_chars: "caratteri",
+    lbl_phone_cut: ", su telefono se ne vedono circa 50",
+    lbl_empty: "(vuota)",
+    lbl_sent_to: "Inviata a",
+    lbl_excluded: "Esclusi",
+    lbl_missing: ": mancante",
+    verdict_pass: "OK",
+    verdict_fail: "BLOCCATA",
+    tag_blocker: "bloccante",
+    tag_warning: "avviso",
+    lbl_fix: "Soluzione:",
+    clean_msg: "Nessun errore bloccante e nessun avviso. Lo sconto raggiunge solo i clienti A rischio, con le esclusioni per margine e blocco assistenza attive.",
+    note_pass: "Anche con esito OK si fa sempre un invio di prova su caselle reali prima di programmare.",
+    note_fail: "Gli errori bloccanti fermano l'invio: la bozza torna indietro con la lista delle correzioni.",
+    edge_pass: "ok",
+    edge_fail: "blocco",
+    kind_ai: "chiamata AI",
+    kind_err: "su errore",
+    kind_code: "regole",
+  },
+};
+
+function detectLang() {
+  const q = new URLSearchParams(location.search).get("lang");
+  if (q === "en" || q === "it") return q;
+  try {
+    const saved = localStorage.getItem("portfolio_lang");
+    if (saved === "en" || saved === "it") return saved;
+  } catch {}
+  return "en";
+}
+let LANG = detectLang();
+const tr = (k) => (I18N[LANG] && I18N[LANG][k]) || I18N.en[k] || k;
+const pick = (v) => (v && typeof v === "object" && !Array.isArray(v) && ("en" in v || "it" in v)) ? (v[LANG] || v.en) : v;
+function countSummary(bCount, wCount) {
+  if (LANG === "it") {
+    const bTxt = `${bCount} ${bCount === 1 ? "errore bloccante" : "errori bloccanti"}`;
+    const wTxt = `${wCount} ${wCount === 1 ? "avviso" : "avvisi"}`;
+    return `${bTxt}, ${wTxt}`;
+  }
+  return `${bCount} blocker${bCount === 1 ? "" : "s"}, ${wCount} warning${wCount === 1 ? "" : "s"}`;
+}
+
 // Three example drafts. Issues follow the fixed rules (Code node) and the AI checks (prompt).
 const RULE_CATS = new Set(["personalization", "links", "utm", "unsubscribe", "mobile_ux", "preview_text", "accessibility"]);
-const by = (cat) => RULE_CATS.has(cat) ? '<span class="by">rule</span>' : '<span class="by ai">AI</span>';
+const by = (cat) => RULE_CATS.has(cat) ? `<span class="by">${esc(tr("by_rule"))}</span>` : '<span class="by ai">AI</span>';
 const DRAFTS = [
   {
-    tab: "Win-back, first draft", note: "the real field-notes bug",
-    esp: "klaviyo", segment: "All Subscribers",
+    tab: { en: "Win-back, first draft", it: "Win-back, prima bozza" },
+    note: { en: "the real field-notes bug", it: "l'errore reale dai test" },
+    esp: "klaviyo",
+    segment: { en: "All Subscribers", it: "Tutti gli iscritti" },
     from: "Negozio Online <news@send.negozio-online.org>",
     subject: "Torna a trovarci oggi: un regalo speciale per te con spedizione 48h!",
     preview: "",
@@ -446,22 +669,58 @@ const DRAFTS = [
       ["text", "Usa il codice TORNA15 ("], ["mark", "valido solo 14 giorni", 4], ["text", ") per il 15% di sconto."],
     ],
     cta: "Scopri la collezione", url: ["https://negozio-online.org/collezione", 2],
-    excluded: [["VIP / Champions", false], ["Purchased last 14 days", false], ["Active CX hold", false]],
+    excluded: [
+      [{ en: "VIP / Champions", it: "VIP / Migliori clienti" }, false],
+      [{ en: "Purchased last 14 days", it: "Acquisto ultimi 14 giorni" }, false],
+      [{ en: "Active CX hold", it: "Blocco assistenza attivo" }, false],
+    ],
     blockers: [
-      ["personalization", "{{ first_name|default:'' }} renders \"Ciao ,\" for profiles without a first name.", "Ciao{% if first_name %} {{ first_name }}{% endif %},"],
-      ["utm", "The CTA link has no UTM parameters.", "?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback"],
-      ["policy_mismatch", "Promises 48-hour shipping, but published_shipping_sla is null.", "Remove the delivery-time claim."],
-      ["policy_mismatch", "Promises a 14-day expiry on the static code TORNA15.", "Use dynamic per-recipient coupons or drop the expiry."],
-      ["vip_margin_guard", "A 15% discount goes to All Subscribers with no VIP, recent-buyer or CX-hold exclusion.", "Exclude the segment Protect Full-Price Margin."],
+      [
+        "personalization",
+        { en: '{{ first_name|default:\'\' }} renders "Ciao ," for profiles without a first name.', it: '{{ first_name|default:\'\' }} stampa "Ciao ," per chi non ha il nome salvato.' },
+        "Ciao{% if first_name %} {{ first_name }}{% endif %},",
+      ],
+      [
+        "utm",
+        { en: "The CTA link has no UTM parameters.", it: "Il link del bottone non ha parametri UTM di tracciamento." },
+        "?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback",
+      ],
+      [
+        "policy_mismatch",
+        { en: "Promises 48-hour shipping, but published_shipping_sla is null.", it: "Promette spedizione in 48 ore, ma il negozio non pubblica tempi garantiti (published_shipping_sla: null)." },
+        { en: "Remove the delivery-time claim.", it: "Rimuovi la promessa sui tempi di consegna." },
+      ],
+      [
+        "policy_mismatch",
+        { en: "Promises a 14-day expiry on the static code TORNA15.", it: "Promette una scadenza di 14 giorni sul codice fisso TORNA15." },
+        { en: "Use dynamic per-recipient coupons or drop the expiry.", it: "Usa coupon dinamici personali oppure togli la scadenza." },
+      ],
+      [
+        "vip_margin_guard",
+        { en: "A 15% discount goes to All Subscribers with no VIP, recent-buyer or CX-hold exclusion.", it: "Sconto del 15% inviato a tutti gli iscritti senza escludere VIP, acquirenti recenti o clienti con blocco assistenza." },
+        { en: "Exclude the segment Protect Full-Price Margin.", it: "Escludi il segmento Protect Full-Price Margin e Active CX Hold." },
+      ],
     ],
     warnings: [
-      ["mobile_ux", "The subject is 68 characters; phones cut it near 50.", "Trim it to 50 characters or fewer.", 0],
-      ["preview_text", "The preview text is empty.", "Add one line that the subject does not already say.", 0],
+      [
+        "mobile_ux",
+        { en: "The subject is 68 characters; phones cut it near 50.", it: "L'oggetto ha 68 caratteri; sugli smartphone viene tagliato intorno a 50." },
+        { en: "Trim it to 50 characters or fewer.", it: "Accorcialo entro 50 caratteri." },
+        0,
+      ],
+      [
+        "preview_text",
+        { en: "The preview text is empty.", it: "Il testo di anteprima è vuoto." },
+        { en: "Add one line that the subject does not already say.", it: "Aggiungi una riga utile che completi l'oggetto." },
+        0,
+      ],
     ],
   },
   {
-    tab: "Black Friday, 20% off", note: "clean copy, margin leak",
-    esp: "klaviyo", segment: "Engaged 180d",
+    tab: { en: "Black Friday, 20% off", it: "Black Friday, -20%" },
+    note: { en: "clean copy, margin leak", it: "testo pulito, margine scoperto" },
+    esp: "klaviyo",
+    segment: { en: "Engaged 180d", it: "Attivi ultimi 180g" },
     from: "Negozio Online <news@send.negozio-online.org>",
     subject: "Black Friday: 20% sulla nuova collezione",
     preview: "Solo fino a domenica sera, reso gratuito in 30 giorni.",
@@ -471,15 +730,25 @@ const DRAFTS = [
       ["text", "Usa il codice BF20 al checkout entro domenica sera."],
     ],
     cta: "Vai alla selezione Black Friday", url: ["https://negozio-online.org/black-friday?utm_source=klaviyo&utm_medium=email&utm_campaign=promo_bf_2026", 0],
-    excluded: [["VIP / Champions", false], ["Purchased last 14 days", false], ["Active CX hold", false]],
+    excluded: [
+      [{ en: "VIP / Champions", it: "VIP / Migliori clienti" }, false],
+      [{ en: "Purchased last 14 days", it: "Acquisto ultimi 14 giorni" }, false],
+      [{ en: "Active CX hold", it: "Blocco assistenza attivo" }, false],
+    ],
     blockers: [
-      ["vip_margin_guard", "A 20% discount without the exclusions for VIPs, full-price repeat buyers, recent buyers and active CX holds.", "Add Protect Full-Price Margin and Active CX Hold to the excluded segments."],
+      [
+        "vip_margin_guard",
+        { en: "A 20% discount without the exclusions for VIPs, full-price repeat buyers, recent buyers and active CX holds.", it: "Sconto del 20% senza escludere VIP, clienti abituali a prezzo pieno, acquirenti recenti e clienti con blocco assistenza." },
+        { en: "Add Protect Full-Price Margin and Active CX Hold to the excluded segments.", it: "Aggiungi Protect Full-Price Margin e Active CX Hold tra i segmenti esclusi." },
+      ],
     ],
     warnings: [],
   },
   {
-    tab: "Win-back, fixed", note: "ready to schedule",
-    esp: "klaviyo", segment: "At risk (91-180d)",
+    tab: { en: "Win-back, fixed", it: "Win-back, corretta" },
+    note: { en: "ready to schedule", it: "pronta da programmare" },
+    esp: "klaviyo",
+    segment: { en: "At risk (91-180d)", it: "A rischio (91-180g)" },
     from: "Negozio Online <news@send.negozio-online.org>",
     subject: "Un piccolo pensiero per il tuo ritorno",
     preview: "Un codice per il tuo prossimo ordine, una volta sola.",
@@ -489,7 +758,10 @@ const DRAFTS = [
       ["text", "Come sempre hai "], ["ok", "30 giorni di reso gratuito"], ["text", "."],
     ],
     cta: "Esplora i nuovi arrivi", url: ["https://negozio-online.org/collezione?utm_source=klaviyo&utm_medium=email&utm_campaign=lifecycle_winback", 0],
-    excluded: [["Protect Full-Price Margin", true], ["Active CX hold", true]],
+    excluded: [
+      [{ en: "Protect Full-Price Margin", it: "Protect Full-Price Margin" }, true],
+      [{ en: "Active CX hold", it: "Blocco assistenza attivo" }, true],
+    ],
     blockers: [],
     warnings: [],
   },
@@ -498,24 +770,27 @@ const DRAFTS = [
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const clean = (s) => String(s).replace(/\s*[\u2013\u2014]\s*/g, ": ");
-let WF = null, WF_TEXT = null, current = 0;
+let WF = null, WF_TEXT = null, WF_FAILED = false, current = 0;
 
 const tabsEl = $("#tabs");
-DRAFTS.forEach((d, i) => {
-  const b = document.createElement("button");
-  b.type = "button"; b.className = "tab"; b.setAttribute("role", "tab"); b.id = "tab-" + i;
-  b.setAttribute("aria-controls", "qa-panel");
-  b.innerHTML = `${esc(d.tab)}<small>${esc(d.note)}</small>`;
-  b.addEventListener("click", () => select(i));
-  b.addEventListener("keydown", (e) => {
-    const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
-    if (!k) return;
-    e.preventDefault();
-    const n = (i + k + DRAFTS.length) % DRAFTS.length;
-    select(n); tabsEl.children[n].focus();
+function renderTabs() {
+  tabsEl.innerHTML = "";
+  DRAFTS.forEach((d, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "tab"; b.setAttribute("role", "tab"); b.id = "tab-" + i;
+    b.setAttribute("aria-controls", "qa-panel");
+    b.innerHTML = `${esc(pick(d.tab))}<small>${esc(pick(d.note))}</small>`;
+    b.addEventListener("click", () => select(i));
+    b.addEventListener("keydown", (e) => {
+      const k = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (!k) return;
+      e.preventDefault();
+      const n = (i + k + DRAFTS.length) % DRAFTS.length;
+      select(n); tabsEl.children[n].focus();
+    });
+    tabsEl.append(b);
   });
-  tabsEl.append(b);
-});
+}
 
 function subjectHTML(s) {
   const chars = [...s];
@@ -530,13 +805,13 @@ function mailHTML(d) {
   const [url, urlIssue] = d.url;
   return `
     <div class="mail-head">
-      <div class="row"><span class="k">From</span><span>${esc(d.from)}</span></div>
-      <div class="row"><span class="k">Subject</span><span class="subj">${subjectHTML(d.subject)}</span></div>
-      <div class="row"><span class="k"></span><span class="count ${len > 50 ? "bad" : ""}">${len} characters${len > 50 ? ", a phone shows about 50" : ""}</span></div>
-      <div class="row"><span class="k">Preview</span><span>${d.preview ? esc(d.preview) : '<span class="count bad">(empty)</span>'}</span></div>
+      <div class="row"><span class="k">${esc(tr("lbl_from"))}</span><span>${esc(d.from)}</span></div>
+      <div class="row"><span class="k">${esc(tr("lbl_subject"))}</span><span class="subj">${subjectHTML(d.subject)}</span></div>
+      <div class="row"><span class="k"></span><span class="count ${len > 50 ? "bad" : ""}">${len} ${esc(tr("lbl_chars"))}${len > 50 ? esc(tr("lbl_phone_cut")) : ""}</span></div>
+      <div class="row"><span class="k">${esc(tr("lbl_preview"))}</span><span>${d.preview ? esc(d.preview) : `<span class="count bad">${esc(tr("lbl_empty"))}</span>`}</span></div>
     </div>
     <div class="mail-body"><p>${body}</p><span class="cta">${esc(d.cta)}</span><div class="url">${urlIssue ? `<span class="mark">${esc(url)}<sup>${urlIssue}</sup></span>` : esc(url)}</div></div>
-    <div class="aud"><b>Sent to</b><span class="pill">${esc(d.segment)}</span><b style="margin-left:8px">Excluded</b>${d.excluded.map(([n, on]) => `<span class="pill ${on ? "on" : "missing"}">${esc(n)}${on ? "" : ": missing"}</span>`).join("")}</div>`;
+    <div class="aud"><b>${esc(tr("lbl_sent_to"))}</b><span class="pill">${esc(pick(d.segment))}</span><b style="margin-left:8px">${esc(tr("lbl_excluded"))}</b>${d.excluded.map(([n, on]) => `<span class="pill ${on ? "on" : "missing"}">${esc(pick(n))}${on ? "" : esc(tr("lbl_missing"))}</span>`).join("")}</div>`;
 }
 
 function select(i) {
@@ -547,14 +822,14 @@ function select(i) {
   $("#mail").innerHTML = mailHTML(d);
 
   const pass = d.blockers.length === 0;
-  const items = d.blockers.map(([cat, issue, fix], j) => `<li><span class="n">${j + 1}</span><span class="cat"><b>blocker</b> ${esc(cat)}${by(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`)
-    .concat(d.warnings.map(([cat, issue, fix]) => `<li class="w"><span class="n">!</span><span class="cat"><b>warning</b> ${esc(cat)}${by(cat)}</span><p>${esc(issue)}</p><p class="fix">Fix: ${esc(fix)}</p></li>`));
+  const items = d.blockers.map(([cat, issue, fix], j) => `<li><span class="n">${j + 1}</span><span class="cat"><b>${esc(tr("tag_blocker"))}</b> ${esc(cat)}${by(cat)}</span><p>${esc(pick(issue))}</p><p class="fix">${esc(tr("lbl_fix"))} ${esc(pick(fix))}</p></li>`)
+    .concat(d.warnings.map(([cat, issue, fix]) => `<li class="w"><span class="n">!</span><span class="cat"><b>${esc(tr("tag_warning"))}</b> ${esc(cat)}${by(cat)}</span><p>${esc(pick(issue))}</p><p class="fix">${esc(tr("lbl_fix"))} ${esc(pick(fix))}</p></li>`));
   const slackNode = WF && WF.nodes.find((n) => n.type.endsWith("slack") && n.name.includes(pass ? "PASS" : "BLOCKED"));
   $("#result").innerHTML = `
-    <div class="verdict ${pass ? "pass" : "fail"}"><b>${pass ? "PASS" : "FAIL"}</b><span>${d.blockers.length} blocker${d.blockers.length === 1 ? "" : "s"}, ${d.warnings.length} warning${d.warnings.length === 1 ? "" : "s"}</span></div>
-    ${items.length ? `<ol class="issues">${items.join("")}</ol>` : `<p class="clean">No blockers and no warnings. The discount reaches only At risk customers, with the margin and CX-hold exclusions attached.</p>`}
+    <div class="verdict ${pass ? "pass" : "fail"}"><b>${esc(pass ? tr("verdict_pass") : tr("verdict_fail"))}</b><span>${esc(countSummary(d.blockers.length, d.warnings.length))}</span></div>
+    ${items.length ? `<ol class="issues">${items.join("")}</ol>` : `<p class="clean">${esc(tr("clean_msg"))}</p>`}
     ${slackNode ? `<div class="slack"><div class="ch">${esc(slackNode.parameters.channelId?.value || slackNode.parameters.channel || "#crm-qa")}</div>${slackText(slackNode.parameters.text, d)}</div>` : ""}
-    <p class="small">${pass ? "PASS still means a live seed-inbox check before scheduling." : "Blockers stop the send: the draft goes back with the fix list."}</p>`;
+    <p class="small">${esc(pass ? tr("note_pass") : tr("note_fail"))}</p>`;
   $("#result").querySelectorAll(".issues li").forEach((li, j) => (li.style.animationDelay = j * 50 + "ms"));
 }
 
@@ -562,9 +837,9 @@ function slackText(template, d) {
   const text = template.replace(/^=/, "").replace(/\{\{([\s\S]*?)\}\}/g, (_, x) =>
     /\.esp\b/.test(x) ? d.esp
     : /\.subject\b/.test(x) ? d.subject
-    : /target_segment_name/.test(x) ? d.segment
-    : /excluded_segments/.test(x) ? (d.excluded.filter(([, on]) => on).map(([n]) => n).join(", ") || "None")
-    : /blockers[\s\S]*\.map/.test(x) ? d.blockers.map(([cat, issue, fix]) => `• *${cat}*: ${issue} -> _Fix:_ ${fix}`).join("\n")
+    : /target_segment_name/.test(x) ? pick(d.segment)
+    : /excluded_segments/.test(x) ? (d.excluded.filter(([, on]) => on).map(([n]) => pick(n)).join(", ") || (LANG === "it" ? "Nessuno" : "None"))
+    : /blockers[\s\S]*\.map/.test(x) ? d.blockers.map(([cat, issue, fix]) => `• *${cat}*: ${pick(issue)} -> _${tr("lbl_fix")}_ ${pick(fix)}`).join("\n")
     : /blockers/.test(x) ? String(d.blockers.length)
     : "...");
   return esc(clean(text.replace(/:[a-z_]+:\s*/g, "")))
@@ -599,7 +874,7 @@ function draw() {
       if (nodes.find((n) => n.name === src).type.endsWith(".if")) {
         const tx = document.createElementNS(NS, "text");
         tx.setAttribute("x", x1 + 6); tx.setAttribute("y", y1 + (y2 > y1 ? 16 : -8));
-        tx.setAttribute("class", "elabel"); tx.textContent = oi === 0 ? "pass" : "fail"; svg.append(tx);
+        tx.setAttribute("class", "elabel"); tx.textContent = oi === 0 ? tr("edge_pass") : tr("edge_fail"); svg.append(tx);
       }
     }));
   }
@@ -610,16 +885,40 @@ function draw() {
     d.style.left = p.x + "px"; d.style.top = p.y + "px"; d.title = clean(n.name);
     const i = n.name.indexOf(": ");
     const short = clean((i > -1 ? n.name.slice(i + 2) : n.name).replace(/\s*\((JSON|#crm-qa|Safe Defaults)\)/g, ""));
-    const kind = { httpRequest: "ai call", errorTrigger: "on error", set: "set" }[t] || t;
+    const kind = { httpRequest: tr("kind_ai"), errorTrigger: tr("kind_err"), set: "set", code: tr("kind_code") }[t] || t;
     d.innerHTML = `<span class="k">${esc(kind)}</span>${esc(short)}`;
     el.append(d);
   }
 }
 
+function renderHero() {
+  const first = DRAFTS[0];
+  $("#hero-card").setAttribute("aria-label", tr("hero_card_label"));
+  $("#hero-mail").innerHTML = mailHTML(first);
+  $("#hero-stamp").innerHTML = `<b>${esc(tr("verdict_fail"))}</b>${esc(countSummary(first.blockers.length, first.warnings.length))}`;
+}
+
+function applyLang(lang) {
+  LANG = lang === "it" ? "it" : "en";
+  document.documentElement.lang = LANG;
+  document.title = tr("page_title");
+  try { localStorage.setItem("portfolio_lang", LANG); } catch {}
+  document.querySelectorAll(".lang-switch button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)));
+  document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-html]").forEach((el) => { el.innerHTML = tr(el.dataset.i18nHtml); });
+  renderHero();
+  renderTabs();
+  select(current);
+  if (WF) draw();
+  else if (WF_FAILED) $("#canvas").innerHTML = `<p class="graph-msg">${tr("graph_err")}</p>`;
+}
+
+document.querySelectorAll(".lang-switch button").forEach((b) => b.addEventListener("click", () => applyLang(b.dataset.lang)));
+
 fetch(BASE + "workflows/ai-email-preflight-qa.n8n.json")
   .then((r) => (r.ok ? r.text() : Promise.reject(new Error("HTTP " + r.status))))
   .then((text) => { WF_TEXT = text; WF = JSON.parse(text); draw(); select(current); })
-  .catch(() => { $("#canvas").innerHTML = `<p class="graph-msg">The workflow file did not load. <a href="https://github.com/errer441122/lifecycle-automation-lab/blob/main/workflows/ai-email-preflight-qa.n8n.json">Open it on GitHub</a>.</p>`; });
+  .catch(() => { WF_FAILED = true; $("#canvas").innerHTML = `<p class="graph-msg">${tr("graph_err")}</p>`; });
 
 let rt;
 window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => WF && draw(), 150); });
@@ -643,10 +942,7 @@ document.querySelectorAll("[data-full]").forEach((b) => b.addEventListener("clic
 $("#lightbox-close").addEventListener("click", () => box.close());
 box.addEventListener("click", (e) => { if (e.target === box) box.close(); });
 
-const first = DRAFTS[0];
-$("#hero-mail").innerHTML = mailHTML(first);
-$("#hero-stamp").innerHTML = `<b>FAIL</b>${first.blockers.length} blockers, ${first.warnings.length} warnings`;
-select(0);
+applyLang(LANG);
 </script>
 </body>
 </html>
